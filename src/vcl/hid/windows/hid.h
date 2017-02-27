@@ -76,10 +76,13 @@ namespace Vcl { namespace HID { namespace Windows
 		int32_t                logicalCalibratedMaximum;
 		// Durch DirectInput-Kalibrierung bestimmte Mittelstellung, falls die Achse kalibriert ist.
 		int32_t                logicalCalibratedCenter;
-		// Physischer Bereich der Achse. Das verarbeiten wir hier nicht, sondern leiten es an die
-		//  Anwendung weiter, damit die damit arbeiten kann.
-		float                  physicalMinimum;
-		float                  physicalMaximum;
+
+
+		/// Physical minimum value
+		int32_t physicalMinimum;
+
+		/// Physical maxiumum value
+		int32_t physicalMaximum;
 
 		/// Name as given by the driver
 		std::wstring name;
@@ -113,6 +116,12 @@ namespace Vcl { namespace HID { namespace Windows
 		HANDLE fileHandle() const { return _fileHandle; }
 
 		const std::vector<Axis>& axes() const { return _axes; }
+		const std::vector<Button>& buttons() const { return _buttons; }
+
+		const std::vector<HIDP_VALUE_CAPS>& axisCaps() const { return _axesCaps; }
+		const std::vector<HIDP_BUTTON_CAPS>& buttonCaps() const { return _buttonCaps; }
+
+		std::vector<USAGE>& buttonStates() { return _buttonStates; }
 
 	private:
 		/// Read the device name from the hardware
@@ -153,6 +162,15 @@ namespace Vcl { namespace HID { namespace Windows
 
 		/// Axes associated with the device
 		std::vector<Axis> _axes;
+
+		/// HID button representation
+		std::vector<HIDP_BUTTON_CAPS> _buttonCaps;
+
+		/// HID axis representation
+		std::vector<HIDP_VALUE_CAPS> _axesCaps;
+
+		/// Button states
+		std::vector<USAGE> _buttonStates;
 	};
 
 	class JoystickHID : public GenericHID

@@ -317,7 +317,7 @@ namespace Vcl { namespace HID { namespace Windows
 			path[95] = wchar_t("0123456789ABCDEF"[(vendor_and_product_id.ProductID >> 4) & 0xF]);
 			path[96] = wchar_t("0123456789ABCDEF"[(vendor_and_product_id.ProductID >> 0) & 0xF]);
 
-			wcscpy_s(path + 98, sizeof(path) - 98, L"Buttons\\???");
+			wcscpy_s(path + 98, sizeof(path) / sizeof(path[0]) - 98, L"Buttons\\???");
 			for (size_t i = 0u; i < sizeof dInputButtonMapping / sizeof dInputButtonMapping[0]; ++i) {
 				if (i >= 100) { // Dreistelliger Name?
 					path[106] = wchar_t('0' + i / 100u);
@@ -381,25 +381,29 @@ namespace Vcl { namespace HID { namespace Windows
 				++current_usage, ++current_index
 			)
 			{
-				// Wurde der Name von DirectInput oder dem Treiber überschrieben?
-				/*wchar_t const * toName = L"";
-				for (auto & mapping : dInputButtonMapping) {
-					if (currentClass.UsagePage == mapping.usagePage && currentUsage == mapping.usage) {
-						toName = mapping.name;
-
-						mapping.usage = 0; // Optimierung: bei zukünfigen Durchläufen überspringen
-						break;
-					}
-				}*/
+				// Check if the button name was overriden by direct input
+				wchar_t const * di_name = L"";
+				//for (auto & mapping : dInputButtonMapping) {
+				//	if (currentClass.UsagePage == mapping.usagePage && currentUsage == mapping.usage) {
+				//		toName = mapping.name;
+				//
+				//		mapping.usage = 0; // Optimierung: bei zukünfigen Durchläufen überspringen
+				//		break;
+				//	}
+				//}
 
 				Button button;
 				button.usagePage = button_cap.UsagePage;
 				button.usage = current_usage;
 				button.index = current_index;
+				button.name = di_name;
 
 				_buttons.emplace_back(button);
 			}
 		}
+
+		_buttonCaps = std::move(button_caps);
+		_buttonStates.resize(_buttons.size(), 0);
 	}
 
 	void GenericHID::storeAxes(std::vector<HIDP_VALUE_CAPS>&& axes_caps)
@@ -413,12 +417,12 @@ namespace Vcl { namespace HID { namespace Windows
 				++current_usage, ++current_index
 				)
 			{
-				//bool            isCalibrated = false;
-				//int32_t         calibratedMinimum;
-				//int32_t         calibratedMaximum;
-				//int32_t         calibratedCenter;
-				//wchar_t const * toName = L"";
-				//
+				bool    is_calibrated = false;
+				int32_t calibrated_minimum;
+				int32_t calibrated_maximum;
+				int32_t calibrated_center;
+				wchar_t const * di_name = L"";
+				
 				// Wurden Kalibrierungsdaten oder Name überschrieben?
 				//for (auto & mapping : dInputAxisMapping) {
 				//	if (currentClass.UsagePage == mapping.usagePage && currentUsage == mapping.usage) {
@@ -441,19 +445,21 @@ namespace Vcl { namespace HID { namespace Windows
 				axis.index = current_index;
 				axis.logicalMinimum = axis_cap.LogicalMin;
 				axis.logicalMaximum = axis_cap.LogicalMax;
-				//axis.isCalibrated = isCalibrated;
-				//if (isCalibrated) {
-				//	axis.logicalCalibratedMinimum = calibratedMinimum;
-				//	axis.logicalCalibratedMaximum = calibratedMaximum;
-				//	axis.logicalCalibratedCenter = calibratedCenter;
-				//}
-				axis.physicalMinimum = float(axis_cap.PhysicalMin);
-				axis.physicalMaximum = float(axis_cap.PhysicalMax);
-				//axis.name = toName;
+				axis.isCalibrated = is_calibrated;
+				if (is_calibrated) {
+					axis.logicalCalibratedMinimum = calibrated_minimum;
+					axis.logicalCalibratedMaximum = calibrated_maximum;
+					axis.logicalCalibratedCenter  = calibrated_center;
+				}
+				axis.physicalMinimum = axis_cap.PhysicalMin;
+				axis.physicalMaximum = axis_cap.PhysicalMax;
+				axis.name = di_name;
 
 				_axes.push_back(axis);
 			}
 		}
+
+		_axesCaps = std::move(axes_caps);
 	}
 
 	JoystickHID::JoystickHID(HANDLE raw_handle)
@@ -511,6 +517,34 @@ namespace Vcl { namespace HID { namespace Windows
 				}
 			}
 		}
+		std::cout << "\t";
+
+		// Reset the states
+		auto& states = buttonStates();
+		states.assign(states.size(), 0);
+
+		USAGE usages[128];
+		ULONG nr_usages = 128;
+		for (const auto& button_caps : buttonCaps())
+		{
+			if (HidP_GetUsages(
+				HidP_Input, button_caps.UsagePage, 0,
+				usages, &nr_usages, preparsed_data,
+				(PCHAR)raw_input->data.hid.bRawData, raw_input->data.hid.dwSizeHid
+			) == HIDP_STATUS_SUCCESS)
+			{
+				for (ULONG i = 0; i < nr_usages; i++)
+				{
+					states[usages[i] - button_caps.Range.UsageMin] = TRUE;
+				}
+			}
+		}
+
+		for (const auto& state : states)
+		{
+			std::cout << state << ", ";
+		}
+
 		std::cout << std::endl;
 
 		return false;
