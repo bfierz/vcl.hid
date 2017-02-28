@@ -116,7 +116,8 @@ namespace Vcl { namespace HID { namespace Windows
 		}
 
 		std::vector<HIDP_BUTTON_CAPS> button_classes(capabilities.NumberInputButtonCaps);
-		if (HidP_GetButtonCaps(
+		if (capabilities.NumberInputButtonCaps > 0 && 
+			HidP_GetButtonCaps(
 			HidP_Input, button_classes.data(), &capabilities.NumberInputButtonCaps, preparsed_data
 		) != HIDP_STATUS_SUCCESS)
 		{
@@ -124,12 +125,32 @@ namespace Vcl { namespace HID { namespace Windows
 		}
 
 		std::vector<HIDP_VALUE_CAPS> axis_classes(capabilities.NumberInputValueCaps);
-		if (HidP_GetValueCaps(
+		if (capabilities.NumberInputValueCaps > 0 &&
+			HidP_GetValueCaps(
 			HidP_Input, axis_classes.data(), &capabilities.NumberInputValueCaps, preparsed_data
 		) != HIDP_STATUS_SUCCESS)
 		{
 			return{};
 		}
+
+		std::vector<HIDP_BUTTON_CAPS> output_button_classes(capabilities.NumberOutputButtonCaps);
+		if (capabilities.NumberOutputButtonCaps > 0 &&
+			HidP_GetButtonCaps(
+			HidP_Output, output_button_classes.data(), &capabilities.NumberOutputButtonCaps, preparsed_data
+		) != HIDP_STATUS_SUCCESS)
+		{
+			return{};
+		}
+
+		std::vector<HIDP_VALUE_CAPS> output_axis_classes(capabilities.NumberOutputValueCaps);
+		if (capabilities.NumberOutputValueCaps > 0 && 
+			HidP_GetValueCaps(
+			HidP_Output, output_axis_classes.data(), &capabilities.NumberOutputValueCaps, preparsed_data
+		) != HIDP_STATUS_SUCCESS)
+		{
+			return{};
+		}
+
 
 		// Initialize ranges for all buttons and axis'
 		size_t nr_buttons = 0;
@@ -417,10 +438,10 @@ namespace Vcl { namespace HID { namespace Windows
 				++current_usage, ++current_index
 				)
 			{
-				bool    is_calibrated = false;
-				int32_t calibrated_minimum;
-				int32_t calibrated_maximum;
-				int32_t calibrated_center;
+				bool    is_calibrated = true;
+				int32_t calibrated_minimum = 0;
+				int32_t calibrated_maximum = 1 <<  axis_cap.BitSize;
+				int32_t calibrated_center  = 1 << (axis_cap.BitSize - 1);
 				wchar_t const * di_name = L"";
 				
 				// Wurden Kalibrierungsdaten oder Name überschrieben?
@@ -493,15 +514,15 @@ namespace Vcl { namespace HID { namespace Windows
 				switch (axis.usage)
 				{
 				case HID_USAGE_GENERIC_X:
-					std::cout << (LONG)value - 128 << ", ";
+					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
 					break;
 
 				case HID_USAGE_GENERIC_Y:
-					std::cout << (LONG)value - 128 << ", ";
+					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
 					break;
 
 				case HID_USAGE_GENERIC_Z:
-					std::cout << (LONG)value - 128 << ", ";
+					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
 					break;
 
 				case HID_USAGE_GENERIC_RX:
@@ -547,7 +568,94 @@ namespace Vcl { namespace HID { namespace Windows
 
 		std::cout << std::endl;
 
-		return false;
+		return true;
+	}
+
+	GamepadHID::GamepadHID(HANDLE raw_handle)
+	: GenericHID(raw_handle)
+	{
+
+	}
+
+	bool GamepadHID::processInput(PRAWINPUT raw_input)
+	{
+		PHIDP_PREPARSED_DATA preparsed_data;
+		if (HidD_GetPreparsedData(fileHandle(), &preparsed_data) == FALSE)
+		{
+			return{};
+		}
+
+		// Free the allocated data structure at the end of the method
+		VCL_SCOPE_EXIT{ HidD_FreePreparsedData(preparsed_data); };
+
+		for (const auto& axis : axes())
+		{
+			// Read the value of the axis
+			ULONG value = 0;
+
+			if (HidP_GetUsageValue(
+				HidP_Input, axis.usagePage, 0,
+				axis.usage, &value, preparsed_data,
+				(PCHAR)raw_input->data.hid.bRawData, raw_input->data.hid.dwSizeHid
+			) == HIDP_STATUS_SUCCESS)
+			{
+				switch (axis.usage)
+				{
+				case HID_USAGE_GENERIC_X:
+					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					break;
+
+				case HID_USAGE_GENERIC_Y:
+					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					break;
+
+				case HID_USAGE_GENERIC_Z:
+					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					break;
+
+				case HID_USAGE_GENERIC_RX:
+					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					break;
+				case HID_USAGE_GENERIC_RY:
+					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					break;
+				case HID_USAGE_GENERIC_HATSWITCH:
+					std::cout << (LONG)value << ", ";
+					break;
+				}
+			}
+		}
+		std::cout << "\t";
+
+		// Reset the states
+		auto& states = buttonStates();
+		states.assign(states.size(), 0);
+
+		USAGE usages[128];
+		ULONG nr_usages = 128;
+		for (const auto& button_caps : buttonCaps())
+		{
+			if (HidP_GetUsages(
+				HidP_Input, button_caps.UsagePage, 0,
+				usages, &nr_usages, preparsed_data,
+				(PCHAR)raw_input->data.hid.bRawData, raw_input->data.hid.dwSizeHid
+			) == HIDP_STATUS_SUCCESS)
+			{
+				for (ULONG i = 0; i < nr_usages; i++)
+				{
+					states[usages[i] - button_caps.Range.UsageMin] = TRUE;
+				}
+			}
+		}
+
+		for (const auto& state : states)
+		{
+			std::cout << state << ", ";
+		}
+
+		std::cout << std::endl;
+
+		return true;
 	}
 
 	DeviceManager::DeviceManager()
@@ -598,6 +706,10 @@ namespace Vcl { namespace HID { namespace Windows
 						_devices.emplace_back(std::make_unique<JoystickHID>(desc.hDevice));
 						break;
 
+					case 0x05:
+						_devices.emplace_back(std::make_unique<GamepadHID>(desc.hDevice));
+						break;
+
 					default:
 						_devices.emplace_back(std::make_unique<GenericHID>(desc.hDevice));
 					}
@@ -613,9 +725,9 @@ namespace Vcl { namespace HID { namespace Windows
 
 		for (size_t i = 0; i < DeviceType::Count; i++)
 		{
-			if (device_types.isSet((DeviceType::Enum) i))
+			if (device_types.isSet((DeviceType::Enum) (1 << i)))
 			{
-				switch (i)
+				switch (1 << i)
 				{
 				case DeviceType::Mouse:
 					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x02, RIDEV_INPUTSINK | RIDEV_NOLEGACY, hWnd });

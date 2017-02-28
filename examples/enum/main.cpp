@@ -78,7 +78,7 @@ int main(char** argv, int argc)
 
 	auto hWnd = CreateWindowExW(0, wc.lpszClassName, L"RawInputTest", 0, 0, 0, 0, 0, HWND_MESSAGE, 0, 0, 0);
 
-	manager.registerDevices(DeviceType::Joystick, hWnd);
+	manager.registerDevices(DeviceType::GamePad, hWnd);
 
 	MSG msg = { 0 };
 	while (GetMessage(&msg, NULL, 0, 0) > 0)

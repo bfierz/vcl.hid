@@ -181,6 +181,15 @@ namespace Vcl { namespace HID { namespace Windows
 		bool processInput(PRAWINPUT raw_input) override;
 	};
 
+	class GamepadHID : public GenericHID
+	{
+	public:
+		GamepadHID(HANDLE raw_handle);
+
+
+		bool processInput(PRAWINPUT raw_input) override;
+	};
+
 	VCL_DECLARE_FLAGS(DeviceType,
 		Mouse,
 		Keyboard,
