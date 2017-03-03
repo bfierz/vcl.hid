@@ -33,12 +33,14 @@
 
 // VCL
 #include <vcl/core/contract.h>
+#include <vcl/hid/joystick.h>
 #include <vcl/util/scopeguard.h>
 
 namespace Vcl { namespace HID { namespace Windows
 {
-	GenericHID::GenericHID(HANDLE raw_handle)
-	: _rawInputHandle(raw_handle)
+	GenericHID::GenericHID(Device* dev, HANDLE raw_handle)
+	: _device(dev)
+	, _rawInputHandle(raw_handle)
 	{
 		// Access the object path of the device name
 		wchar_t path_buffer[260 + 4];
@@ -53,7 +55,7 @@ namespace Vcl { namespace HID { namespace Windows
 		path_buffer[1] = L'\\';
 
 		_fileHandle = CreateFileW(
-			path_buffer, 0u,
+			path_buffer, 0,
 			FILE_SHARE_READ | FILE_SHARE_WRITE, // wir können anderen Prozessen nicht verbieten, das HID zu benutzen
 			nullptr,
 			OPEN_EXISTING,
@@ -64,7 +66,9 @@ namespace Vcl { namespace HID { namespace Windows
 			return;
 		}
 
-		_name = readDeviceName();
+		const auto names = readDeviceName();
+		_device->setVendorName(names.first);
+		_device->setDeviceName(names.second);
 
 		auto caps = readDeviceCaps();
 
@@ -80,21 +84,21 @@ namespace Vcl { namespace HID { namespace Windows
 		return false;
 	}
 
-	std::wstring GenericHID::readDeviceName() const
+	auto GenericHID::readDeviceName() const -> std::pair<std::wstring, std::wstring>
 	{
-		wchar_t name_buffer[255];
-		if (HidD_GetManufacturerString(_fileHandle, name_buffer, 127) == FALSE)
+		wchar_t vendor_buffer[255];
+		wchar_t device_buffer[255];
+		if (HidD_GetManufacturerString(_fileHandle, vendor_buffer, 255) == FALSE)
 		{
-			wcscpy_s(name_buffer, L"(unknown)");
+			wcscpy_s(vendor_buffer, L"(unknown)");
 		}
-		else
+		
+		if (HidD_GetProductString(_fileHandle, device_buffer, 255) == FALSE)
 		{
-			auto manufacturer_length = wcslen(name_buffer);
-			name_buffer[manufacturer_length++] = ' ';
-			HidD_GetProductString(_fileHandle, name_buffer + manufacturer_length, ULONG(255 - manufacturer_length));
+			wcscpy_s(device_buffer, L"(unknown)");
 		}
 
-		return name_buffer;
+		return std::make_pair(vendor_buffer, device_buffer);
 	}
 
 	auto GenericHID::readDeviceCaps() const
@@ -483,8 +487,8 @@ namespace Vcl { namespace HID { namespace Windows
 		_axesCaps = std::move(axes_caps);
 	}
 
-	JoystickHID::JoystickHID(HANDLE raw_handle)
-	: GenericHID(raw_handle)
+	JoystickHID::JoystickHID(Device* dev, HANDLE raw_handle)
+	: GenericHID(dev, raw_handle)
 	{
 
 	}
@@ -571,14 +575,18 @@ namespace Vcl { namespace HID { namespace Windows
 		return true;
 	}
 
-	GamepadHID::GamepadHID(HANDLE raw_handle)
-	: GenericHID(raw_handle)
+	GamepadHID::GamepadHID(Device* dev, HANDLE raw_handle)
+	: GenericHID(dev, raw_handle)
 	{
 
 	}
 
 	bool GamepadHID::processInput(PRAWINPUT raw_input)
 	{
+		// We are not interested in keyboard or mouse data received via raw input
+		if (raw_input->header.dwType != RIM_TYPEHID)
+			return false;
+
 		PHIDP_PREPARSED_DATA preparsed_data;
 		if (HidD_GetPreparsedData(fileHandle(), &preparsed_data) == FALSE)
 		{
@@ -703,19 +711,28 @@ namespace Vcl { namespace HID { namespace Windows
 					switch (dev_info.hid.usUsage)
 					{
 					case 0x04:
-						_devices.emplace_back(std::make_unique<JoystickHID>(desc.hDevice));
+						_devices.emplace_back(std::make_unique<Joystick>());
+						_devicesWin.emplace_back(std::make_unique<JoystickHID>(_devices.back().get(), desc.hDevice));
 						break;
 
 					case 0x05:
-						_devices.emplace_back(std::make_unique<GamepadHID>(desc.hDevice));
+						_devices.emplace_back(std::make_unique<Device>());
+						_devicesWin.emplace_back(std::make_unique<GamepadHID>(_devices.back().get(), desc.hDevice));
 						break;
 
 					default:
-						_devices.emplace_back(std::make_unique<GenericHID>(desc.hDevice));
+						_devices.emplace_back(std::make_unique<Device>());
+						_devicesWin.emplace_back(std::make_unique<GenericHID>(_devices.back().get(), desc.hDevice));
 					}
 				}
 			}
 		}
+	}
+
+	gsl::span<const Device* const> DeviceManager::devices() const
+	{
+		auto& cont = reinterpret_cast<const std::vector<const Device*>&>(_devices);
+		return gsl::make_span<std::vector<const Device*>>(cont);
 	}
 
 	void DeviceManager::registerDevices(Flags<DeviceType> device_types, HWND hWnd)
@@ -773,13 +790,13 @@ namespace Vcl { namespace HID { namespace Windows
 		GetRawInputData(raw_input_handle, RID_INPUT, raw_input, &buffer_size, sizeof(RAWINPUTHEADER));
 
 		// Pass the input data to the correct device
-		auto dev_it = std::find_if(_devices.begin(), _devices.end(), [&raw_input](const auto& device)
+		auto dev_it = std::find_if(_devicesWin.begin(), _devicesWin.end(), [&raw_input](const auto& device)
 		{
 			return device->rawHandle() == raw_input->header.hDevice;
 		});
 
 		bool processed = false;
-		if (dev_it != _devices.end())
+		if (dev_it != _devicesWin.end())
 		{
 			processed = (*dev_it)->processInput(raw_input);
 		}

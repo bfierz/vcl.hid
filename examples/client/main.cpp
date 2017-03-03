@@ -28,14 +28,66 @@
 #include <vcl/config/global.h>
 
 // C++ Standard library
+#include <iostream>
 
 // VCL
-#include <vcl/hid/device.h>
+#include <vcl/hid/windows/hid.h>
 
-namespace Vcl { namespace HID
+Vcl::HID::Windows::DeviceManager manager;
+
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	class Joystick : public Device
+	switch (message)
 	{
+	case WM_CREATE:
+	{
+	}
+	break;
+	case WM_INPUT:
+	{
+		if (manager.processInput(hWnd, message, wParam, lParam))
+		{
+			return 0;
+		}
+		else
+		{
+			return DefWindowProc(hWnd, message, wParam, lParam);
+		}
+	}
+	break;
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
+}
 
-	};
-}}
+int main(char** argv, int argc)
+{
+	using namespace Vcl::HID::Windows;
+
+	// Create a hidden window (message only window)
+	WNDCLASSW wc = { 0 };
+	wc.lpfnWndProc = WndProc;
+	wc.hInstance = GetModuleHandle(NULL);
+	wc.hbrBackground = (HBRUSH)(COLOR_BACKGROUND);
+	wc.lpszClassName = L"RawInputTest";
+	wc.style = CS_OWNDC;
+
+	if (!RegisterClassW(&wc))
+		return 1;
+
+	auto hWnd = CreateWindowExW(0, wc.lpszClassName, L"RawInputTest", 0, 0, 0, 0, 0, HWND_MESSAGE, 0, 0, 0);
+
+	manager.registerDevices(Vcl::HID::DeviceType::GamePad, hWnd);
+
+	MSG msg = { 0 };
+	while (GetMessage(&msg, NULL, 0, 0) > 0)
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+
+	// Tear town the window
+	CloseWindow(hWnd);
+	return 0;
+}

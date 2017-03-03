@@ -21,9 +21,11 @@ SET(VCL_HID_WINDOWS_SRC
 )
 
 SET(VCL_HID_INC
+	src/vcl/hid/device.h
 	src/vcl/hid/joystick.h
 )
 SET(VCL_HID_SRC
+	src/vcl/hid/device.cpp
 	src/vcl/hid/joystick.cpp
 )
 
@@ -53,10 +55,11 @@ TARGET_LINK_LIBRARIES(vcl.hid
 OPTION(VCL_HID_BUILD_EXAMPLES "Build the examples" OFF)
 IF (VCL_HID_BUILD_EXAMPLES)
 
+	# Enumeration example
 	SET(VCL_HID_EXAMPLE_ENUM_SRC
 		examples/enum/main.cpp
 	)
-
+	
 	SOURCE_GROUP("" FILES ${VCL_HID_EXAMPLE_ENUM_SRC})
 
 	ADD_EXECUTABLE(vcl.hid.enum
@@ -67,5 +70,21 @@ IF (VCL_HID_BUILD_EXAMPLES)
 	TARGET_LINK_LIBRARIES(vcl.hid.enum
 		vcl.hid
 	)
+
+	# Sample client example
+	SET(VCL_HID_EXAMPLE_CLIENT_SRC
+		examples/client/main.cpp
+	)
 	
+	SOURCE_GROUP("" FILES ${VCL_HID_EXAMPLE_CLIENT_SRC})
+	
+	ADD_EXECUTABLE(vcl.hid.client
+		${VCL_HID_EXAMPLE_CLIENT_SRC}
+	)
+	
+	SET_TARGET_PROPERTIES(vcl.hid.client PROPERTIES FOLDER examples)
+	TARGET_LINK_LIBRARIES(vcl.hid.client
+		vcl.hid
+	)
+
 ENDIF (VCL_HID_BUILD_EXAMPLES)

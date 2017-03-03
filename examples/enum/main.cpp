@@ -33,61 +33,19 @@
 // VCL
 #include <vcl/hid/windows/hid.h>
 
-Vcl::HID::Windows::DeviceManager manager;
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	switch (message)
-	{
-	case WM_CREATE:
-	{
-	}
-	break;
-	case WM_INPUT:
-	{
-		if (manager.processInput(hWnd, message, wParam, lParam))
-		{
-			return 0;
-		}
-		else
-		{
-			return DefWindowProc(hWnd, message, wParam, lParam);
-		}
-	}
-	break;
-	default:
-		return DefWindowProc(hWnd, message, wParam, lParam);
-	}
-	return 0;
-}
-
 int main(char** argv, int argc)
 {
 	using namespace Vcl::HID::Windows;
 
-	// Create a hidden window (message only window)
-	WNDCLASSW wc = { 0 };
-	wc.lpfnWndProc = WndProc;
-	wc.hInstance = GetModuleHandle(NULL);
-	wc.hbrBackground = (HBRUSH)(COLOR_BACKGROUND);
-	wc.lpszClassName = L"RawInputTest";
-	wc.style = CS_OWNDC;
+	Vcl::HID::Windows::DeviceManager manager;
 
-	if (!RegisterClassW(&wc))
-		return 1;
-
-	auto hWnd = CreateWindowExW(0, wc.lpszClassName, L"RawInputTest", 0, 0, 0, 0, 0, HWND_MESSAGE, 0, 0, 0);
-
-	manager.registerDevices(DeviceType::GamePad, hWnd);
-
-	MSG msg = { 0 };
-	while (GetMessage(&msg, NULL, 0, 0) > 0)
+	const auto devs = manager.devices();
+	for (auto dev : devs)
 	{
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
+		std::wcout << dev->vendorName() << L", " << dev->deviceName() << L"\n";
+
+		std::wcout << std::endl;
 	}
 
-	// Tear town the window
-	CloseWindow(hWnd);
 	return 0;
 }

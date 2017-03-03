@@ -30,12 +30,35 @@
 // C++ Standard library
 
 // VCL
-#include <vcl/hid/device.h>
+#include <vcl/core/flags.h>
 
 namespace Vcl { namespace HID
 {
-	class Joystick : public Device
-	{
+	VCL_DECLARE_FLAGS(DeviceType,
+		Mouse,
+		Keyboard,
+		Joystick,
+		GamePad,
+		MultiAxisController
+	);
 
+	/*!
+	 *
+	 */
+	class Device
+	{
+	public:
+		const std::wstring& vendorName() const { return _vendor; }
+		void setVendorName(const std::wstring& name) { _vendor = name; }
+
+		const std::wstring& deviceName() const { return _name; }
+		void setDeviceName(const std::wstring& name) { _name = name; }
+
+	private:
+		/// Vendor name
+		std::wstring _vendor;
+
+		/// Vendor defined device name
+		std::wstring _name;
 	};
 }}

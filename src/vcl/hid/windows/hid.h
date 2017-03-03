@@ -33,6 +33,9 @@
 #include <tuple>
 #include <vector>
 
+// GSL
+#include <gsl/gsl>
+
 // Windows API
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -41,7 +44,7 @@ extern "C" {
 }
 
 // VCL
-#include <vcl/core/flags.h>
+#include <vcl/hid/device.h>
 
 namespace Vcl { namespace HID { namespace Windows
 {
@@ -106,7 +109,7 @@ namespace Vcl { namespace HID { namespace Windows
 	class GenericHID
 	{
 	public:
-		GenericHID(HANDLE raw_handle);
+		GenericHID(Device* dev, HANDLE raw_handle);
 
 		HANDLE rawHandle() const { return _rawInputHandle; }
 
@@ -126,7 +129,7 @@ namespace Vcl { namespace HID { namespace Windows
 	private:
 		/// Read the device name from the hardware
 		/// \returns the vendor defined name
-		std::wstring readDeviceName() const;
+		auto readDeviceName() const -> std::pair<std::wstring, std::wstring>;
 
 		/// Read the device capabilities
 		auto readDeviceCaps() const -> std::tuple<std::vector<HIDP_BUTTON_CAPS>, std::vector<HIDP_VALUE_CAPS>>;
@@ -148,14 +151,14 @@ namespace Vcl { namespace HID { namespace Windows
 		void storeAxes(std::vector<HIDP_VALUE_CAPS>&& axes_caps);
 
 	private:
+		/// Link to the device
+		Device* _device;
+
 		/// Handle provided by the raw input API
 		HANDLE _rawInputHandle{ nullptr };
 
 		/// Handle from the file API
 		HANDLE _fileHandle{ nullptr };
-
-		/// Vendor defined device name
-		std::wstring _name;
 
 		/// Buttons associated with the device
 		std::vector<Button> _buttons;
@@ -176,7 +179,7 @@ namespace Vcl { namespace HID { namespace Windows
 	class JoystickHID : public GenericHID
 	{
 	public:
-		JoystickHID(HANDLE raw_handle);
+		JoystickHID(Device* dev, HANDLE raw_handle);
 
 		bool processInput(PRAWINPUT raw_input) override;
 	};
@@ -184,24 +187,18 @@ namespace Vcl { namespace HID { namespace Windows
 	class GamepadHID : public GenericHID
 	{
 	public:
-		GamepadHID(HANDLE raw_handle);
+		GamepadHID(Device* dev, HANDLE raw_handle);
 
 
 		bool processInput(PRAWINPUT raw_input) override;
 	};
 
-	VCL_DECLARE_FLAGS(DeviceType,
-		Mouse,
-		Keyboard,
-		Joystick,
-		GamePad,
-		MultiAxisController
-	);
-
 	class DeviceManager
 	{
 	public:
 		DeviceManager();
+	
+		gsl::span<const Device* const> devices() const;
 
 		void registerDevices(Flags<DeviceType> device_types, HWND hWnd);
 
@@ -209,6 +206,9 @@ namespace Vcl { namespace HID { namespace Windows
 
 	private:
 		/// List of all input devices
-		std::vector<std::unique_ptr<GenericHID>> _devices;
+		std::vector<std::unique_ptr<Device>> _devices;
+
+		/// List of Windows HID
+		std::vector<std::unique_ptr<GenericHID>> _devicesWin;
 	};
 }}}
