@@ -36,6 +36,8 @@
 int main(char** argv, int argc)
 {
 	using namespace Vcl::HID::Windows;
+	using Vcl::HID::DeviceType;
+	using Vcl::HID::Joystick;
 
 	Vcl::HID::Windows::DeviceManager manager;
 
@@ -43,6 +45,14 @@ int main(char** argv, int argc)
 	for (auto dev : devs)
 	{
 		std::wcout << dev->vendorName() << L", " << dev->deviceName() << L"\n";
+		switch (dev->type())
+		{
+		case DeviceType::Joystick:
+
+
+			std::wcout << L"Number of buttons: " << dynamic_cast<const Joystick*>(dev)->nrButtons() << L"\n";
+			break;
+		}
 
 		std::wcout << std::endl;
 	}

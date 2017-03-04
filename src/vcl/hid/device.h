@@ -35,11 +35,14 @@
 namespace Vcl { namespace HID
 {
 	VCL_DECLARE_FLAGS(DeviceType,
-		Mouse,
-		Keyboard,
-		Joystick,
-		GamePad,
-		MultiAxisController
+		Undefined,          // Usage: 0x0
+		Pointer,            // Usage: 0x1
+		Mouse,              // Usage: 0x2
+		Joystick,           // Usage: 0x4
+		GamePad,            // Usage: 0x5
+		Keyboard,           // Usage: 0x6
+		Keypad,             // Usage: 0x7
+		MultiAxisController // Usage: 0x8
 	);
 
 	/*!
@@ -48,13 +51,22 @@ namespace Vcl { namespace HID
 	class Device
 	{
 	public:
-		const std::wstring& vendorName() const { return _vendor; }
-		void setVendorName(const std::wstring& name) { _vendor = name; }
+		Device(DeviceType::Enum type);
+		virtual ~Device() = default;
 
+		DeviceType::Enum type() const { return _type; }
+
+		const std::wstring& vendorName() const { return _vendor; }
 		const std::wstring& deviceName() const { return _name; }
+
+	protected:
+		void setVendorName(const std::wstring& name) { _vendor = name; }
 		void setDeviceName(const std::wstring& name) { _name = name; }
 
 	private:
+		/// Device type
+		DeviceType::Enum _type;
+
 		/// Vendor name
 		std::wstring _vendor;
 

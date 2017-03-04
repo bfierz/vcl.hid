@@ -37,6 +37,8 @@ Vcl::HID::Windows::DeviceManager manager;
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	using namespace Vcl::HID;
+
 	switch (message)
 	{
 	case WM_CREATE:
@@ -47,6 +49,56 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		if (manager.processInput(hWnd, message, wParam, lParam))
 		{
+			// Output buffer
+			std::wstringstream output;
+			output.precision(2);
+
+			// Write current HID state to the console
+			HANDLE std_out = GetStdHandle(STD_OUTPUT_HANDLE);
+
+			SHORT curr_line = 2;
+			for (auto dev : manager.devices())
+			{
+				output.clear();
+
+				SetConsoleCursorPosition(std_out, { 0, curr_line++ });
+				switch (dev->type())
+				{
+				case DeviceType::Joystick:
+				{
+					output << L"Joystick ";
+
+					auto joystick = dynamic_cast<const Joystick*>(dev);
+					for (size_t i = 0; i < joystick->nrAxes(); i++)
+					{
+						auto state = joystick->axisState(static_cast<JoystickAxis>(i));
+						output << state << L" ";
+					}
+
+					for (size_t i = 0; i < joystick->nrButtons(); i++)
+					{
+						auto pressed = joystick->buttonState(i);
+						if (pressed)
+						{
+							output << L"1 ";
+						}
+						else
+						{
+							output << L"0 ";
+						}
+					}
+					output << L"\n";
+
+					DWORD written = 0;
+					WriteConsoleW(std_out,
+						output.str().c_str(), output.str().size(),
+						&written, nullptr);
+
+					break;
+				}
+				}
+			}
+			
 			return 0;
 		}
 		else
@@ -78,7 +130,16 @@ int main(char** argv, int argc)
 
 	auto hWnd = CreateWindowExW(0, wc.lpszClassName, L"RawInputTest", 0, 0, 0, 0, 0, HWND_MESSAGE, 0, 0, 0);
 
-	manager.registerDevices(Vcl::HID::DeviceType::GamePad, hWnd);
+	manager.registerDevices(Vcl::HID::DeviceType::Joystick, hWnd);
+
+	// Write the header
+	HANDLE std_out = GetStdHandle(STD_OUTPUT_HANDLE);
+	SetCursorPos(0, 0);
+
+	wchar_t* title= L"HID";
+	DWORD written = 0;
+	WriteConsoleW(std_out, title, wcslen(title), &written, nullptr);
+
 
 	MSG msg = { 0 };
 	while (GetMessage(&msg, NULL, 0, 0) > 0)

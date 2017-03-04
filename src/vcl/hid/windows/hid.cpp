@@ -33,13 +33,12 @@
 
 // VCL
 #include <vcl/core/contract.h>
-#include <vcl/hid/joystick.h>
 #include <vcl/util/scopeguard.h>
 
 namespace Vcl { namespace HID { namespace Windows
 {
-	GenericHID::GenericHID(Device* dev, HANDLE raw_handle)
-	: _device(dev)
+	GenericHID::GenericHID(HANDLE raw_handle)
+	: Device(DeviceType::Undefined)
 	, _rawInputHandle(raw_handle)
 	{
 		// Access the object path of the device name
@@ -67,8 +66,8 @@ namespace Vcl { namespace HID { namespace Windows
 		}
 
 		const auto names = readDeviceName();
-		_device->setVendorName(names.first);
-		_device->setDeviceName(names.second);
+		setVendorName(names.first);
+		setDeviceName(names.second);
 
 		auto caps = readDeviceCaps();
 
@@ -487,10 +486,30 @@ namespace Vcl { namespace HID { namespace Windows
 		_axesCaps = std::move(axes_caps);
 	}
 
-	JoystickHID::JoystickHID(Device* dev, HANDLE raw_handle)
-	: GenericHID(dev, raw_handle)
+	namespace
 	{
+		float normalizeAxis(ULONG value, const Axis& axis)
+		{
+			if (value < axis.logicalCalibratedCenter)
+			{
+				float range = axis.logicalCalibratedCenter - axis.logicalCalibratedMinimum;
+				return ((LONG)value - axis.logicalCalibratedCenter) / range;
+			}
+			else
+			{
+				float range = axis.logicalCalibratedMaximum - axis.logicalCalibratedCenter;
+				return ((LONG)value - axis.logicalCalibratedCenter) / range;
+			}
+		}
+	}
 
+	JoystickHID::JoystickHID(HANDLE raw_handle)
+	: GenericHID(raw_handle)
+	, Joystick()
+	, Device(DeviceType::Joystick)
+	{
+		setNrAxes(axes().size());
+		setNrButtons(buttons().size());
 	}
 
 	bool JoystickHID::processInput(PRAWINPUT raw_input)
@@ -518,35 +537,36 @@ namespace Vcl { namespace HID { namespace Windows
 				switch (axis.usage)
 				{
 				case HID_USAGE_GENERIC_X:
-					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					setAxisState(JoystickAxis::X, normalizeAxis(value, axis));
 					break;
 
 				case HID_USAGE_GENERIC_Y:
-					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					setAxisState(JoystickAxis::Y, normalizeAxis(value, axis));
 					break;
 
 				case HID_USAGE_GENERIC_Z:
-					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					setAxisState(JoystickAxis::Z, normalizeAxis(value, axis));
 					break;
 
 				case HID_USAGE_GENERIC_RX:
+					setAxisState(JoystickAxis::RX, normalizeAxis(value, axis));
 					break;
 				case HID_USAGE_GENERIC_RY:
+					setAxisState(JoystickAxis::RY, normalizeAxis(value, axis));
 					break;
 				case HID_USAGE_GENERIC_RZ:
-					break;
-				case HID_USAGE_GENERIC_SLIDER:
-					break;
-				case HID_USAGE_GENERIC_HATSWITCH:
+					setAxisState(JoystickAxis::RZ, normalizeAxis(value, axis));
 					break;
 				}
 			}
 		}
-		std::cout << "\t";
 
 		// Reset the states
 		auto& states = buttonStates();
 		states.assign(states.size(), 0);
+
+		// Output set
+		std::bitset<32> button_states;
 
 		USAGE usages[128];
 		ULONG nr_usages = 128;
@@ -558,25 +578,20 @@ namespace Vcl { namespace HID { namespace Windows
 				(PCHAR)raw_input->data.hid.bRawData, raw_input->data.hid.dwSizeHid
 			) == HIDP_STATUS_SUCCESS)
 			{
-				for (ULONG i = 0; i < nr_usages; i++)
+				for (ULONG i = 0; i < std::min(nr_usages, 32ul); i++)
 				{
-					states[usages[i] - button_caps.Range.UsageMin] = TRUE;
+					button_states[usages[i] - button_caps.Range.UsageMin] = true;
 				}
 			}
 		}
-
-		for (const auto& state : states)
-		{
-			std::cout << state << ", ";
-		}
-
-		std::cout << std::endl;
+		setButtonStates(std::move(button_states));
 
 		return true;
 	}
 
-	GamepadHID::GamepadHID(Device* dev, HANDLE raw_handle)
-	: GenericHID(dev, raw_handle)
+	GamepadHID::GamepadHID(HANDLE raw_handle)
+	: GenericHID(raw_handle)
+	, Device(DeviceType::GamePad)
 	{
 
 	}
@@ -711,28 +726,27 @@ namespace Vcl { namespace HID { namespace Windows
 					switch (dev_info.hid.usUsage)
 					{
 					case 0x04:
-						_devices.emplace_back(std::make_unique<Joystick>());
-						_devicesWin.emplace_back(std::make_unique<JoystickHID>(_devices.back().get(), desc.hDevice));
+						_devices.emplace_back(std::make_unique<JoystickHID>(desc.hDevice));
 						break;
 
 					case 0x05:
-						_devices.emplace_back(std::make_unique<Device>());
-						_devicesWin.emplace_back(std::make_unique<GamepadHID>(_devices.back().get(), desc.hDevice));
+						_devices.emplace_back(std::make_unique<GamepadHID>(desc.hDevice));
 						break;
 
 					default:
-						_devices.emplace_back(std::make_unique<Device>());
-						_devicesWin.emplace_back(std::make_unique<GenericHID>(_devices.back().get(), desc.hDevice));
+						_devices.emplace_back(std::make_unique<GenericHID>(desc.hDevice));
 					}
+					// Store a link to the created device for external use
+					_deviceLinks.emplace_back(static_cast<Device*>(_devices.back().get()));
 				}
 			}
 		}
 	}
 
-	gsl::span<const Device* const> DeviceManager::devices() const
+	gsl::span<Device const* const> DeviceManager::devices() const
 	{
-		auto& cont = reinterpret_cast<const std::vector<const Device*>&>(_devices);
-		return gsl::make_span<std::vector<const Device*>>(cont);
+		Device const* const* ptr = _deviceLinks.data();
+		return gsl::make_span<Device const* const>(ptr, _deviceLinks.size());
 	}
 
 	void DeviceManager::registerDevices(Flags<DeviceType> device_types, HWND hWnd)
@@ -790,13 +804,13 @@ namespace Vcl { namespace HID { namespace Windows
 		GetRawInputData(raw_input_handle, RID_INPUT, raw_input, &buffer_size, sizeof(RAWINPUTHEADER));
 
 		// Pass the input data to the correct device
-		auto dev_it = std::find_if(_devicesWin.begin(), _devicesWin.end(), [&raw_input](const auto& device)
+		auto dev_it = std::find_if(_devices.begin(), _devices.end(), [&raw_input](const auto& device)
 		{
 			return device->rawHandle() == raw_input->header.hDevice;
 		});
 
 		bool processed = false;
-		if (dev_it != _devicesWin.end())
+		if (dev_it != _devices.end())
 		{
 			processed = (*dev_it)->processInput(raw_input);
 		}

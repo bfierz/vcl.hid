@@ -28,14 +28,52 @@
 #include <vcl/config/global.h>
 
 // C++ Standard library
+#include <array>
+#include <bitset>
 
 // VCL
 #include <vcl/hid/device.h>
 
 namespace Vcl { namespace HID
 {
-	class Joystick : public Device
+	enum class JoystickAxis
 	{
+		X,
+		Y,
+		Z,
+		RX,
+		RY,
+		RZ
+	};
 
+	class Joystick : public virtual Device
+	{
+	public:
+		Joystick();
+
+		uint32_t nrAxes() const;
+		uint32_t nrButtons() const;
+
+		float axisState(JoystickAxis axis) const;
+		bool buttonState(size_t idx) const;
+
+	protected:
+		void setNrAxes(uint32_t nr_axes);
+		void setNrButtons(uint32_t nr_buttons);
+		void setAxisState(JoystickAxis axis, float state);
+		void setButtonStates(std::bitset<32>&& states);
+
+	private:
+		/// Number of reported axes
+		uint32_t _nrAxes{ 0 };
+
+		/// Number of reported buttons
+		uint32_t _nrButtons{ 0 };
+
+		/// Axes states
+		std::array<float, 8> _axes;
+
+		/// Buttons states
+		std::bitset<32> _buttons;
 	};
 }}

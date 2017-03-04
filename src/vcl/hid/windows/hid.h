@@ -45,6 +45,7 @@ extern "C" {
 
 // VCL
 #include <vcl/hid/device.h>
+#include <vcl/hid/joystick.h>
 
 namespace Vcl { namespace HID { namespace Windows
 {
@@ -106,10 +107,10 @@ namespace Vcl { namespace HID { namespace Windows
 		std::wstring name;
 	};
 
-	class GenericHID
+	class GenericHID : public virtual Device
 	{
 	public:
-		GenericHID(Device* dev, HANDLE raw_handle);
+		GenericHID(HANDLE raw_handle);
 
 		HANDLE rawHandle() const { return _rawInputHandle; }
 
@@ -151,9 +152,6 @@ namespace Vcl { namespace HID { namespace Windows
 		void storeAxes(std::vector<HIDP_VALUE_CAPS>&& axes_caps);
 
 	private:
-		/// Link to the device
-		Device* _device;
-
 		/// Handle provided by the raw input API
 		HANDLE _rawInputHandle{ nullptr };
 
@@ -176,10 +174,10 @@ namespace Vcl { namespace HID { namespace Windows
 		std::vector<USAGE> _buttonStates;
 	};
 
-	class JoystickHID : public GenericHID
+	class JoystickHID : public GenericHID, public Joystick
 	{
 	public:
-		JoystickHID(Device* dev, HANDLE raw_handle);
+		JoystickHID(HANDLE raw_handle);
 
 		bool processInput(PRAWINPUT raw_input) override;
 	};
@@ -187,7 +185,7 @@ namespace Vcl { namespace HID { namespace Windows
 	class GamepadHID : public GenericHID
 	{
 	public:
-		GamepadHID(Device* dev, HANDLE raw_handle);
+		GamepadHID(HANDLE raw_handle);
 
 
 		bool processInput(PRAWINPUT raw_input) override;
@@ -198,17 +196,17 @@ namespace Vcl { namespace HID { namespace Windows
 	public:
 		DeviceManager();
 	
-		gsl::span<const Device* const> devices() const;
+		gsl::span<Device const* const> devices() const;
 
 		void registerDevices(Flags<DeviceType> device_types, HWND hWnd);
 
 		bool processInput(HWND window_handle, UINT message, WPARAM wide_param, LPARAM low_param);
 
 	private:
-		/// List of all input devices
-		std::vector<std::unique_ptr<Device>> _devices;
-
 		/// List of Windows HID
-		std::vector<std::unique_ptr<GenericHID>> _devicesWin;
+		std::vector<std::unique_ptr<GenericHID>> _devices;
+
+		/// List of device pointers (links to `_devices`)
+		std::vector<Device*> _deviceLinks;
 	};
 }}}
