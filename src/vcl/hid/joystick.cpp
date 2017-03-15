@@ -53,17 +53,17 @@ namespace Vcl { namespace HID
 		_nrButtons = nr_buttons;
 	}
 
-	float Joystick::axisState(JoystickAxis axis) const
+	float Joystick::axisState(uint32_t axis) const
 	{
-		return _axes[static_cast<size_t>(axis)];
+		return _axes[axis];
 	}
 
-	void Joystick::setAxisState(JoystickAxis axis, float state)
+	void Joystick::setAxisState(uint32_t axis, float state)
 	{
-		_axes[static_cast<size_t>(axis)] = state;
+		_axes[axis] = state;
 	}
 
-	bool Joystick::buttonState(size_t idx) const
+	bool Joystick::buttonState(uint32_t idx) const
 	{
 		Require(idx < std::min(32u, nrButtons()), "Button index is valid.");
 

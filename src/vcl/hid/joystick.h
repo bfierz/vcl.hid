@@ -54,13 +54,13 @@ namespace Vcl { namespace HID
 		uint32_t nrAxes() const;
 		uint32_t nrButtons() const;
 
-		float axisState(JoystickAxis axis) const;
-		bool buttonState(size_t idx) const;
+		float axisState(uint32_t axis) const;
+		bool buttonState(uint32_t idx) const;
 
 	protected:
 		void setNrAxes(uint32_t nr_axes);
 		void setNrButtons(uint32_t nr_buttons);
-		void setAxisState(JoystickAxis axis, float state);
+		void setAxisState(uint32_t axis, float state);
 		void setButtonStates(std::bitset<32>&& states);
 
 	private:

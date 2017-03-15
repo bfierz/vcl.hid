@@ -45,7 +45,6 @@ extern "C" {
 
 // VCL
 #include <vcl/hid/device.h>
-#include <vcl/hid/joystick.h>
 
 namespace Vcl { namespace HID { namespace Windows
 {
@@ -125,8 +124,6 @@ namespace Vcl { namespace HID { namespace Windows
 		const std::vector<HIDP_VALUE_CAPS>& axisCaps() const { return _axesCaps; }
 		const std::vector<HIDP_BUTTON_CAPS>& buttonCaps() const { return _buttonCaps; }
 
-		std::vector<USAGE>& buttonStates() { return _buttonStates; }
-
 	private:
 		/// Read the device name from the hardware
 		/// \returns the vendor defined name
@@ -169,12 +166,10 @@ namespace Vcl { namespace HID { namespace Windows
 
 		/// HID axis representation
 		std::vector<HIDP_VALUE_CAPS> _axesCaps;
-
-		/// Button states
-		std::vector<USAGE> _buttonStates;
 	};
 
-	class JoystickHID : public GenericHID, public Joystick
+	template<typename JoystickType>
+	class JoystickHID : public GenericHID, public JoystickType
 	{
 	public:
 		JoystickHID(HANDLE raw_handle);
@@ -182,7 +177,8 @@ namespace Vcl { namespace HID { namespace Windows
 		bool processInput(PRAWINPUT raw_input) override;
 	};
 
-	class GamepadHID : public GenericHID
+	template<typename GamepadType>
+	class GamepadHID : public GenericHID, public GamepadType
 	{
 	public:
 		GamepadHID(HANDLE raw_handle);

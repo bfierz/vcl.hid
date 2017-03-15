@@ -32,6 +32,8 @@
 
 // VCL
 #include <vcl/hid/windows/hid.h>
+#include <vcl/hid/joystick.h>
+#include <vcl/hid/gamepad.h>
 
 Vcl::HID::Windows::DeviceManager manager;
 
@@ -59,6 +61,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			SHORT curr_line = 2;
 			for (auto dev : manager.devices())
 			{
+				output.str(std::wstring{});
 				output.clear();
 
 				SetConsoleCursorPosition(std_out, { 0, curr_line++ });
@@ -71,7 +74,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					auto joystick = dynamic_cast<const Joystick*>(dev);
 					for (size_t i = 0; i < joystick->nrAxes(); i++)
 					{
-						auto state = joystick->axisState(static_cast<JoystickAxis>(i));
+						auto state = joystick->axisState(i);
 						output << state << L" ";
 					}
 
@@ -89,14 +92,43 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					}
 					output << L"\n";
 
-					DWORD written = 0;
-					WriteConsoleW(std_out,
-						output.str().c_str(), output.str().size(),
-						&written, nullptr);
+					break;
+				}
+				case DeviceType::Gamepad:
+				{
+					output << L"Gamepad ";
+
+					auto gamepad = dynamic_cast<const Gamepad*>(dev);
+					for (size_t i = 0; i < gamepad->nrAxes(); i++)
+					{
+						auto state = gamepad->axisState(i);
+						output << state << L" ";
+					}
+
+					output << static_cast<uint32_t>(gamepad->hatState()) << " ";
+
+					for (size_t i = 0; i < gamepad->nrButtons(); i++)
+					{
+						auto pressed = gamepad->buttonState(i);
+						if (pressed)
+						{
+							output << L"1 ";
+						}
+						else
+						{
+							output << L"0 ";
+						}
+					}
+					output << L"\n";
 
 					break;
 				}
 				}
+
+				DWORD written = 0;
+				WriteConsoleW(std_out,
+					output.str().c_str(), output.str().size(),
+					&written, nullptr);
 			}
 			
 			return 0;
@@ -130,7 +162,7 @@ int main(char** argv, int argc)
 
 	auto hWnd = CreateWindowExW(0, wc.lpszClassName, L"RawInputTest", 0, 0, 0, 0, 0, HWND_MESSAGE, 0, 0, 0);
 
-	manager.registerDevices(Vcl::HID::DeviceType::Joystick, hWnd);
+	manager.registerDevices(Vcl::HID::DeviceType::Joystick | Vcl::HID::DeviceType::Gamepad, hWnd);
 
 	// Write the header
 	HANDLE std_out = GetStdHandle(STD_OUTPUT_HANDLE);

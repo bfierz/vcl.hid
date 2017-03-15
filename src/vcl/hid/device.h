@@ -39,7 +39,7 @@ namespace Vcl { namespace HID
 		Pointer,            // Usage: 0x1
 		Mouse,              // Usage: 0x2
 		Joystick,           // Usage: 0x4
-		GamePad,            // Usage: 0x5
+		Gamepad,            // Usage: 0x5
 		Keyboard,           // Usage: 0x6
 		Keypad,             // Usage: 0x7
 		MultiAxisController // Usage: 0x8

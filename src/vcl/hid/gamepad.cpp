@@ -22,49 +22,63 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#pragma once
-
-// VCL configuration
-#include <vcl/config/global.h>
-
-// C++ Standard library
-#include <iostream>
+#include "gamepad.h"
 
 // VCL
-#include <vcl/hid/windows/hid.h>
-#include <vcl/hid/joystick.h>
-#include <vcl/hid/gamepad.h>
+#include <vcl/core/contract.h>
 
-int main(char** argv, int argc)
+namespace Vcl { namespace HID
 {
-	using namespace Vcl::HID::Windows;
-	using Vcl::HID::DeviceType;
-	using Vcl::HID::Joystick;
-	using Vcl::HID::Gamepad;
-
-	Vcl::HID::Windows::DeviceManager manager;
-
-	const auto devs = manager.devices();
-	for (auto dev : devs)
+	Gamepad::Gamepad()
+	: Device(DeviceType::Gamepad)
 	{
-		std::wcout << dev->vendorName() << L", " << dev->deviceName() << L"\n";
-		switch (dev->type())
-		{
-		case DeviceType::Joystick:
-
-			std::wcout << L"Number of axes: "    << dynamic_cast<const Joystick*>(dev)->nrAxes() << L"\n";
-			std::wcout << L"Number of buttons: " << dynamic_cast<const Joystick*>(dev)->nrButtons() << L"\n";
-			break;
-
-		case DeviceType::Gamepad:
-
-			std::wcout << L"Number of axes: "    << dynamic_cast<const Joystick*>(dev)->nrAxes() << L"\n";
-			std::wcout << L"Number of buttons: " << dynamic_cast<const Joystick*>(dev)->nrButtons() << L"\n";
-			break;
-		}
-
-		std::wcout << std::endl;
+		_axes.assign(0);
 	}
 
-	return 0;
-}
+	uint32_t Gamepad::nrAxes() const
+	{
+		return _nrAxes;
+	}
+	void Gamepad::setNrAxes(uint32_t nr_axes)
+	{
+		_nrAxes = nr_axes;
+	}
+
+	uint32_t Gamepad::nrButtons() const
+	{
+		return _nrButtons;
+	}
+	void Gamepad::setNrButtons(uint32_t nr_buttons)
+	{
+		_nrButtons = nr_buttons;
+	}
+
+	float Gamepad::axisState(uint32_t axis) const
+	{
+		return _axes[axis];
+	}
+
+	void Gamepad::setAxisState(uint32_t axis, float state)
+	{
+		_axes[axis] = state;
+	}
+
+	bool Gamepad::buttonState(uint32_t idx) const
+	{
+		Require(idx < std::min(32u, nrButtons()), "Button index is valid.");
+
+		return _buttons[idx];
+	}
+
+	void Gamepad::setButtonStates(std::bitset<32>&& states)
+	{
+		_buttons = states;
+	}
+
+	void Gamepad::setHatState(uint32_t state)
+	{
+		Require(state < 9, "Hat state is valid.");
+
+		_hat = static_cast<GamepadHat>(state);
+	}
+}}

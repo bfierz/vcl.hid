@@ -28,43 +28,78 @@
 #include <vcl/config/global.h>
 
 // C++ Standard library
-#include <iostream>
+#include <array>
+#include <bitset>
 
 // VCL
-#include <vcl/hid/windows/hid.h>
-#include <vcl/hid/joystick.h>
-#include <vcl/hid/gamepad.h>
+#include <vcl/hid/device.h>
 
-int main(char** argv, int argc)
+namespace Vcl { namespace HID
 {
-	using namespace Vcl::HID::Windows;
-	using Vcl::HID::DeviceType;
-	using Vcl::HID::Joystick;
-	using Vcl::HID::Gamepad;
-
-	Vcl::HID::Windows::DeviceManager manager;
-
-	const auto devs = manager.devices();
-	for (auto dev : devs)
+	enum class GamepadAxis
 	{
-		std::wcout << dev->vendorName() << L", " << dev->deviceName() << L"\n";
-		switch (dev->type())
-		{
-		case DeviceType::Joystick:
+		X,
+		Y,
+		Z,
+		RX,
+		RY,
+		RZ
+	};
 
-			std::wcout << L"Number of axes: "    << dynamic_cast<const Joystick*>(dev)->nrAxes() << L"\n";
-			std::wcout << L"Number of buttons: " << dynamic_cast<const Joystick*>(dev)->nrButtons() << L"\n";
-			break;
+	enum class GamepadHat
+	{
+		None,
+		N,
+		NE,
+		E,
+		SE,
+		S,
+		SW,
+		W,
+		NW
+	};
 
-		case DeviceType::Gamepad:
+	class Gamepad : public virtual Device
+	{
+	public:
+		Gamepad();
 
-			std::wcout << L"Number of axes: "    << dynamic_cast<const Joystick*>(dev)->nrAxes() << L"\n";
-			std::wcout << L"Number of buttons: " << dynamic_cast<const Joystick*>(dev)->nrButtons() << L"\n";
-			break;
-		}
+		uint32_t nrAxes() const;
+		uint32_t nrButtons() const;
 
-		std::wcout << std::endl;
-	}
+		float axisState(uint32_t axis) const;
+		bool buttonState(uint32_t idx) const;
+		GamepadHat hatState() const { return _hat; }
 
-	return 0;
-}
+	protected:
+		void setNrAxes(uint32_t nr_axes);
+		void setNrButtons(uint32_t nr_buttons);
+		void setAxisState(uint32_t axis, float state);
+		void setHatState(uint32_t state);
+		void setButtonStates(std::bitset<32>&& states);
+
+	private:
+		/// Number of reported axes
+		uint32_t _nrAxes{ 0 };
+
+		/// Number of reported buttons
+		uint32_t _nrButtons{ 0 };
+
+		/// Axes states
+		std::array<float, 8> _axes;
+
+		/// Buttons states
+		std::bitset<32> _buttons;
+
+		/// Hat state
+		GamepadHat _hat{ GamepadHat::None };
+	};
+
+	class XBox360Controller : public Gamepad
+	{
+	public:
+		XBox360Controller() = default;
+
+
+	};
+}}

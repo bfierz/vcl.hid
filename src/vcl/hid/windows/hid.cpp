@@ -33,6 +33,8 @@
 
 // VCL
 #include <vcl/core/contract.h>
+#include <vcl/hid/joystick.h>
+#include <vcl/hid/gamepad.h>
 #include <vcl/util/scopeguard.h>
 
 namespace Vcl { namespace HID { namespace Windows
@@ -427,7 +429,6 @@ namespace Vcl { namespace HID { namespace Windows
 		}
 
 		_buttonCaps = std::move(button_caps);
-		_buttonStates.resize(_buttons.size(), 0);
 	}
 
 	void GenericHID::storeAxes(std::vector<HIDP_VALUE_CAPS>&& axes_caps)
@@ -503,16 +504,18 @@ namespace Vcl { namespace HID { namespace Windows
 		}
 	}
 
-	JoystickHID::JoystickHID(HANDLE raw_handle)
+	template<typename JoystickType>
+	JoystickHID<JoystickType>::JoystickHID(HANDLE raw_handle)
 	: GenericHID(raw_handle)
-	, Joystick()
+	, JoystickType()
 	, Device(DeviceType::Joystick)
 	{
 		setNrAxes(axes().size());
 		setNrButtons(buttons().size());
 	}
 
-	bool JoystickHID::processInput(PRAWINPUT raw_input)
+	template<typename JoystickType>
+	bool JoystickHID<JoystickType>::processInput(PRAWINPUT raw_input)
 	{
 		PHIDP_PREPARSED_DATA preparsed_data;
 		if (HidD_GetPreparsedData(fileHandle(), &preparsed_data) == FALSE)
@@ -537,33 +540,29 @@ namespace Vcl { namespace HID { namespace Windows
 				switch (axis.usage)
 				{
 				case HID_USAGE_GENERIC_X:
-					setAxisState(JoystickAxis::X, normalizeAxis(value, axis));
+					setAxisState(static_cast<uint32_t>(JoystickAxis::X), normalizeAxis(value, axis));
 					break;
 
 				case HID_USAGE_GENERIC_Y:
-					setAxisState(JoystickAxis::Y, normalizeAxis(value, axis));
+					setAxisState(static_cast<uint32_t>(JoystickAxis::Y), normalizeAxis(value, axis));
 					break;
 
 				case HID_USAGE_GENERIC_Z:
-					setAxisState(JoystickAxis::Z, normalizeAxis(value, axis));
+					setAxisState(static_cast<uint32_t>(JoystickAxis::Z), normalizeAxis(value, axis));
 					break;
 
 				case HID_USAGE_GENERIC_RX:
-					setAxisState(JoystickAxis::RX, normalizeAxis(value, axis));
+					setAxisState(static_cast<uint32_t>(JoystickAxis::RX), normalizeAxis(value, axis));
 					break;
 				case HID_USAGE_GENERIC_RY:
-					setAxisState(JoystickAxis::RY, normalizeAxis(value, axis));
+					setAxisState(static_cast<uint32_t>(JoystickAxis::RY), normalizeAxis(value, axis));
 					break;
 				case HID_USAGE_GENERIC_RZ:
-					setAxisState(JoystickAxis::RZ, normalizeAxis(value, axis));
+					setAxisState(static_cast<uint32_t>(JoystickAxis::RZ), normalizeAxis(value, axis));
 					break;
 				}
 			}
 		}
-
-		// Reset the states
-		auto& states = buttonStates();
-		states.assign(states.size(), 0);
 
 		// Output set
 		std::bitset<32> button_states;
@@ -589,14 +588,18 @@ namespace Vcl { namespace HID { namespace Windows
 		return true;
 	}
 
-	GamepadHID::GamepadHID(HANDLE raw_handle)
+	template<typename GamepadType>
+	GamepadHID<GamepadType>::GamepadHID(HANDLE raw_handle)
 	: GenericHID(raw_handle)
-	, Device(DeviceType::GamePad)
+	, GamepadType()
+	, Device(DeviceType::Gamepad)
 	{
-
+		setNrAxes(axes().size());
+		setNrButtons(buttons().size());
 	}
 
-	bool GamepadHID::processInput(PRAWINPUT raw_input)
+	template<typename GamepadType>
+	bool GamepadHID<GamepadType>::processInput(PRAWINPUT raw_input)
 	{
 		// We are not interested in keyboard or mouse data received via raw input
 		if (raw_input->header.dwType != RIM_TYPEHID)
@@ -625,34 +628,34 @@ namespace Vcl { namespace HID { namespace Windows
 				switch (axis.usage)
 				{
 				case HID_USAGE_GENERIC_X:
-					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					setAxisState(static_cast<uint32_t>(GamepadAxis::X), normalizeAxis(value, axis));
 					break;
 
 				case HID_USAGE_GENERIC_Y:
-					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					setAxisState(static_cast<uint32_t>(GamepadAxis::Y), normalizeAxis(value, axis));
 					break;
 
 				case HID_USAGE_GENERIC_Z:
-					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					setAxisState(static_cast<uint32_t>(GamepadAxis::Z), normalizeAxis(value, axis));
 					break;
 
 				case HID_USAGE_GENERIC_RX:
-					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					setAxisState(static_cast<uint32_t>(GamepadAxis::RX), normalizeAxis(value, axis));
 					break;
 				case HID_USAGE_GENERIC_RY:
-					std::cout << (LONG)value - axis.logicalCalibratedCenter << ", ";
+					setAxisState(static_cast<uint32_t>(GamepadAxis::RY), normalizeAxis(value, axis));
 					break;
 				case HID_USAGE_GENERIC_HATSWITCH:
-					std::cout << (LONG)value << ", ";
+					setHatState(value);
 					break;
+				default:
+					DebugError("Not implemented");
 				}
 			}
 		}
-		std::cout << "\t";
 
-		// Reset the states
-		auto& states = buttonStates();
-		states.assign(states.size(), 0);
+		// Output set
+		std::bitset<32> button_states;
 
 		USAGE usages[128];
 		ULONG nr_usages = 128;
@@ -664,19 +667,13 @@ namespace Vcl { namespace HID { namespace Windows
 				(PCHAR)raw_input->data.hid.bRawData, raw_input->data.hid.dwSizeHid
 			) == HIDP_STATUS_SUCCESS)
 			{
-				for (ULONG i = 0; i < nr_usages; i++)
+				for (ULONG i = 0; i < std::min(nr_usages, 32ul); i++)
 				{
-					states[usages[i] - button_caps.Range.UsageMin] = TRUE;
+					button_states[usages[i] - button_caps.Range.UsageMin] = true;
 				}
 			}
 		}
-
-		for (const auto& state : states)
-		{
-			std::cout << state << ", ";
-		}
-
-		std::cout << std::endl;
+		setButtonStates(std::move(button_states));
 
 		return true;
 	}
@@ -726,11 +723,11 @@ namespace Vcl { namespace HID { namespace Windows
 					switch (dev_info.hid.usUsage)
 					{
 					case 0x04:
-						_devices.emplace_back(std::make_unique<JoystickHID>(desc.hDevice));
+						_devices.emplace_back(std::make_unique<JoystickHID<Joystick>>(desc.hDevice));
 						break;
 
 					case 0x05:
-						_devices.emplace_back(std::make_unique<GamepadHID>(desc.hDevice));
+						_devices.emplace_back(std::make_unique<GamepadHID<Gamepad>>(desc.hDevice));
 						break;
 
 					default:
@@ -769,7 +766,7 @@ namespace Vcl { namespace HID { namespace Windows
 				case DeviceType::Joystick:
 					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x04, RIDEV_INPUTSINK, hWnd });
 					break;
-				case DeviceType::GamePad:
+				case DeviceType::Gamepad:
 					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x05, RIDEV_INPUTSINK, hWnd });
 					break;
 				case DeviceType::MultiAxisController:

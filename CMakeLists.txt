@@ -22,10 +22,12 @@ SET(VCL_HID_WINDOWS_SRC
 
 SET(VCL_HID_INC
 	src/vcl/hid/device.h
+	src/vcl/hid/gamepad.h
 	src/vcl/hid/joystick.h
 )
 SET(VCL_HID_SRC
 	src/vcl/hid/device.cpp
+	src/vcl/hid/gamepad.cpp
 	src/vcl/hid/joystick.cpp
 )
 
