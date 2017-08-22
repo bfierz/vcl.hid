@@ -39,6 +39,25 @@
 
 namespace Vcl { namespace HID { namespace Windows
 {
+	// Direct-input button mapping
+	struct DirectInputButtonMapping
+	{
+		WORD    usagePage;
+		WORD    usage;
+		wchar_t name[32];
+	};
+
+	// Direct-input axis mapping and calibration
+	struct DirectInputAxisMapping
+	{
+		WORD                 usagePage;
+		WORD                 usage;
+		bool                 isCalibrated;
+		DIOBJECTCALIBRATION  calibration;
+		wchar_t              name[32];
+	};
+
+
 	GenericHID::GenericHID(HANDLE raw_handle)
 	: Device(DeviceType::Undefined)
 	, _rawInputHandle(raw_handle)
@@ -57,7 +76,7 @@ namespace Vcl { namespace HID { namespace Windows
 
 		_fileHandle = CreateFileW(
 			path_buffer, 0,
-			FILE_SHARE_READ | FILE_SHARE_WRITE, // wir können anderen Prozessen nicht verbieten, das HID zu benutzen
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
 			nullptr,
 			OPEN_EXISTING,
 			0u, nullptr
@@ -73,11 +92,14 @@ namespace Vcl { namespace HID { namespace Windows
 
 		auto caps = readDeviceCaps();
 
-		calibrateButtons(std::get<0>(caps));
-		calibrateAxes(   std::get<1>(caps));
+		DirectInputButtonMapping di_button_mapping[128] = {};
+		DirectInputAxisMapping di_axis_mapping[7] = {};
 
-		storeButtons(std::move(std::get<0>(caps)));
-		storeAxes(   std::move(std::get<1>(caps)));
+		calibrateButtons(std::get<0>(caps), di_button_mapping);
+		calibrateAxes(   std::get<1>(caps), di_axis_mapping);
+
+		storeButtons(std::move(std::get<0>(caps)), di_button_mapping);
+		storeAxes(   std::move(std::get<1>(caps)), di_axis_mapping);
 	}
 
 	bool GenericHID::processInput(PRAWINPUT raw_input)
@@ -156,7 +178,6 @@ namespace Vcl { namespace HID { namespace Windows
 			return{};
 		}
 
-
 		// Initialize ranges for all buttons and axis'
 		size_t nr_buttons = 0;
 		for (auto& button : button_classes)
@@ -193,17 +214,8 @@ namespace Vcl { namespace HID { namespace Windows
 		return std::make_tuple(std::move(button_classes), std::move(axis_classes));
 	}
 
-	void GenericHID::calibrateAxes(std::vector<HIDP_VALUE_CAPS>& axes_caps)
+	void GenericHID::calibrateAxes(std::vector<HIDP_VALUE_CAPS>& axes_caps, gsl::span<struct DirectInputAxisMapping> di_axis_mapping)
 	{
-		struct MappingAndCalibration
-		{
-			WORD                 usagePage;
-			WORD                 usage;
-			bool                 isCalibrated;
-			DIOBJECTCALIBRATION  calibration;
-			wchar_t              name[32];
-		} dInputAxisMapping[7] = {};
-
 		for (const auto& axis : axes_caps)
 		{
 			if (axis.UsagePage != HID_USAGE_PAGE_GENERIC)
@@ -218,18 +230,18 @@ namespace Vcl { namespace HID { namespace Windows
 				const auto index = unsigned(current_usage - HID_USAGE_GENERIC_X);
 				if (index < 7)
 				{
-					dInputAxisMapping[index].usagePage = HID_USAGE_PAGE_GENERIC;
-					dInputAxisMapping[index].usagePage = current_usage;
+					di_axis_mapping[index].usagePage = HID_USAGE_PAGE_GENERIC;
+					di_axis_mapping[index].usagePage = current_usage;
 				}
 			}
 		}
 
 		// In case there is no Z-Axis, the slider ist mapped to the empty position
-		if (dInputAxisMapping[2].usagePage == 0)
+		if (di_axis_mapping[2].usagePage == 0)
 		{
-			dInputAxisMapping[2] = dInputAxisMapping[6];
-			dInputAxisMapping[6].usagePage = 0;
-			dInputAxisMapping[6].usage = 0;
+			di_axis_mapping[2] = di_axis_mapping[6];
+			di_axis_mapping[6].usagePage = 0;
+			di_axis_mapping[6].usage = 0;
 		}
 		
 		HIDD_ATTRIBUTES vendor_and_product_id;
@@ -245,24 +257,23 @@ namespace Vcl { namespace HID { namespace Windows
 			path[95] = wchar_t("0123456789ABCDEF"[(vendor_and_product_id.ProductID >> 4) & 0xF]);
 			path[96] = wchar_t("0123456789ABCDEF"[(vendor_and_product_id.ProductID >> 0) & 0xF]);
 
-			for (size_t i = 0; i < sizeof dInputAxisMapping / sizeof dInputAxisMapping[0]; ++i)
+			for (size_t i = 0; i < sizeof di_axis_mapping / sizeof(di_axis_mapping[0]); ++i)
 			{
 				path[103] = wchar_t('0' + i);
 
 				HKEY key = nullptr;
 				if (RegOpenKeyExW(HKEY_CURRENT_USER, path, 0, KEY_READ, &key) != 0)
 				{
-					// No calibratino data was found
+					// No calibration data was found
 					continue;
 				}
 				{
 					DWORD valueType = REG_NONE;
 					DWORD valueSize = 0;
 					RegQueryValueExW(key, L"", nullptr, &valueType, nullptr, &valueSize);
-					if (REG_SZ == valueType && sizeof dInputAxisMapping[i].name > valueSize)
+					if (REG_SZ == valueType && sizeof(di_axis_mapping[i].name) > valueSize)
 					{
-						RegQueryValueExW(key, L"", nullptr, &valueType, LPBYTE(dInputAxisMapping[i].name), &valueSize);
-						// Der Name wurde bereits bei der Erzeugung genullt; kein Grund, die Null manuell anzufügen.
+						RegQueryValueExW(key, L"", nullptr, &valueType, LPBYTE(di_axis_mapping[i].name), &valueSize);
 					}
 				}
 
@@ -270,15 +281,14 @@ namespace Vcl { namespace HID { namespace Windows
 				DWORD              valueType = REG_NONE;
 				DWORD              valueSize = 0;
 				RegQueryValueExW(key, L"Attributes", nullptr, &valueType, nullptr, &valueSize);
-				if (REG_BINARY == valueType && sizeof mapping == valueSize)
+				if (REG_BINARY == valueType && sizeof(mapping) == valueSize)
 				{
 					RegQueryValueExW(key, L"Attributes", nullptr, &valueType, LPBYTE(&mapping), &valueSize);
-					if (0x15 > mapping.wUsagePage) { // Gültige Usage Page?
-						dInputAxisMapping[i].usagePage = mapping.wUsagePage;
-						dInputAxisMapping[i].usage = mapping.wUsage;
+					if (0x15 > mapping.wUsagePage)
+					{
+						di_axis_mapping[i].usagePage = mapping.wUsagePage;
+						di_axis_mapping[i].usage = mapping.wUsage;
 					}
-
-					// Hier solltet ihr Debug-Informationen ausgeben um das Ergebnis zu kontrollieren …
 				}
 
 				RegCloseKey(key);
@@ -294,7 +304,7 @@ namespace Vcl { namespace HID { namespace Windows
 			path[94] = wchar_t("0123456789ABCDEF"[(vendor_and_product_id.ProductID >>  4) & 0xF]);
 			path[95] = wchar_t("0123456789ABCDEF"[(vendor_and_product_id.ProductID >>  0) & 0xF]);
 
-			for (size_t i = 0; i < sizeof dInputAxisMapping / sizeof dInputAxisMapping[0]; ++i)
+			for (size_t i = 0; i < sizeof(di_axis_mapping) / sizeof(di_axis_mapping[0]); ++i)
 			{
 				path[121] = wchar_t('0' + i);
 
@@ -303,16 +313,16 @@ namespace Vcl { namespace HID { namespace Windows
 				HKEY key = nullptr;
 				if (0 == RegOpenKeyExW(HKEY_CURRENT_USER, path, 0u, KEY_READ, &key))
 				{
-					auto & calibration = dInputAxisMapping[i].calibration;
+					auto & calibration = di_axis_mapping[i].calibration;
 					DWORD  valueType = REG_NONE;
 					DWORD  valueSize = 0;
 					RegQueryValueExW(key, L"Calibration", nullptr, &valueType, nullptr, &valueSize);
-					if (REG_BINARY == valueType && sizeof calibration == valueSize) {
-
-						if (0 == RegQueryValueExW(key, L"Calibration", nullptr, &valueType, LPBYTE(&calibration), &valueSize)) {
-							dInputAxisMapping[i].isCalibrated = true;
+					if (REG_BINARY == valueType && sizeof(calibration) == valueSize)
+					{
+						if (0 == RegQueryValueExW(key, L"Calibration", nullptr, &valueType, LPBYTE(&calibration), &valueSize))
+						{
+							di_axis_mapping[i].isCalibrated = true;
 						}
-
 					}
 
 					RegCloseKey(key);
@@ -322,14 +332,8 @@ namespace Vcl { namespace HID { namespace Windows
 		}
 	}
 
-	void GenericHID::calibrateButtons(std::vector<HIDP_BUTTON_CAPS>& button_caps)
+	void GenericHID::calibrateButtons(std::vector<HIDP_BUTTON_CAPS>& button_caps, gsl::span<struct DirectInputButtonMapping> di_button_mapping)
 	{
-		struct Mapping {
-			WORD    usagePage; // Null falls unbenutzt
-			WORD    usage;
-			wchar_t name[32];
-		} dInputButtonMapping[128] = {}; // Nullinitialisierung
-
 		HIDD_ATTRIBUTES vendor_and_product_id;
 		if (FALSE != HidD_GetAttributes(fileHandle(), &vendor_and_product_id))
 		{
@@ -344,19 +348,19 @@ namespace Vcl { namespace HID { namespace Windows
 			path[96] = wchar_t("0123456789ABCDEF"[(vendor_and_product_id.ProductID >> 0) & 0xF]);
 
 			wcscpy_s(path + 98, sizeof(path) / sizeof(path[0]) - 98, L"Buttons\\???");
-			for (size_t i = 0u; i < sizeof dInputButtonMapping / sizeof dInputButtonMapping[0]; ++i) {
-				if (i >= 100) { // Dreistelliger Name?
+			for (size_t i = 0u; i < sizeof di_button_mapping / sizeof(di_button_mapping[0]); ++i) {
+				if (i >= 100) {
 					path[106] = wchar_t('0' + i / 100u);
 					path[107] = wchar_t('0' + i % 100u / 10u);
 					path[108] = wchar_t('0' + i % 10u);
 					path[109] = wchar_t('\0');
 				}
-				else if (i >= 10u) { // Zweistelliger Name?
+				else if (i >= 10u) {
 					path[106] = wchar_t('0' + i / 10u);
 					path[107] = wchar_t('0' + i % 10u);
 					path[108] = wchar_t('\0');
 				}
-				else { // Einstelliger Name?
+				else {
 					path[106] = wchar_t('0' + i);
 					path[107] = wchar_t('\0');
 				}
@@ -370,8 +374,9 @@ namespace Vcl { namespace HID { namespace Windows
 					DWORD valueType = REG_NONE;
 					DWORD valueSize = 0;
 					RegQueryValueExW(key, L"", nullptr, &valueType, nullptr, &valueSize);
-					if (REG_SZ == valueType && sizeof dInputButtonMapping[i].name > valueSize) {
-						RegQueryValueExW(key, L"", nullptr, &valueType, LPBYTE(dInputButtonMapping[i].name), &valueSize);
+					if (REG_SZ == valueType && sizeof(di_button_mapping[i].name) > valueSize)
+					{
+						RegQueryValueExW(key, L"", nullptr, &valueType, LPBYTE(di_button_mapping[i].name), &valueSize);
 					}
 				}
 
@@ -379,24 +384,21 @@ namespace Vcl { namespace HID { namespace Windows
 				DWORD              valueType = REG_NONE;
 				DWORD              valueSize = 0;
 				RegQueryValueExW(key, L"Attributes", nullptr, &valueType, nullptr, &valueSize);
-				if (REG_BINARY == valueType && sizeof mapping == valueSize) {
+				if (REG_BINARY == valueType && sizeof(mapping) == valueSize) {
 
 					RegQueryValueExW(key, L"Attributes", nullptr, &valueType, LPBYTE(&mapping), &valueSize);
-					if (0x15 > mapping.wUsagePage) { // Gültige Usage Page?
-						dInputButtonMapping[i].usagePage = mapping.wUsagePage;
-						dInputButtonMapping[i].usage = mapping.wUsage;
+					if (0x15 > mapping.wUsagePage) {
+						di_button_mapping[i].usagePage = mapping.wUsagePage;
+						di_button_mapping[i].usage = mapping.wUsage;
 					}
-
-					// Nochmal Debug-Informationen!
 				}
 
 				RegCloseKey(key);
-			} // for jeden Knopf
-
+			}
 		}
 	}
 
-	void GenericHID::storeButtons(std::vector<HIDP_BUTTON_CAPS>&& button_caps)
+	void GenericHID::storeButtons(std::vector<HIDP_BUTTON_CAPS>&& button_caps, gsl::span<struct DirectInputButtonMapping> di_button_mapping)
 	{
 		for (const auto& button_cap : button_caps)
 		{
@@ -409,14 +411,15 @@ namespace Vcl { namespace HID { namespace Windows
 			{
 				// Check if the button name was overriden by direct input
 				wchar_t const * di_name = L"";
-				//for (auto & mapping : dInputButtonMapping) {
-				//	if (currentClass.UsagePage == mapping.usagePage && currentUsage == mapping.usage) {
-				//		toName = mapping.name;
-				//
-				//		mapping.usage = 0; // Optimierung: bei zukünfigen Durchläufen überspringen
-				//		break;
-				//	}
-				//}
+				for (auto & mapping : di_button_mapping) {
+					if (button_cap.UsagePage == mapping.usagePage && current_usage == mapping.usage) {
+						di_name = mapping.name;
+				
+						// Skip this mapping in following runs
+						mapping.usage = 0;
+						break;
+					}
+				}
 
 				Button button;
 				button.usagePage = button_cap.UsagePage;
@@ -431,7 +434,7 @@ namespace Vcl { namespace HID { namespace Windows
 		_buttonCaps = std::move(button_caps);
 	}
 
-	void GenericHID::storeAxes(std::vector<HIDP_VALUE_CAPS>&& axes_caps)
+	void GenericHID::storeAxes(std::vector<HIDP_VALUE_CAPS>&& axes_caps, gsl::span<struct DirectInputAxisMapping> di_axis_mapping)
 	{
 		for (const auto& axis_cap : axes_caps)
 		{
@@ -448,21 +451,21 @@ namespace Vcl { namespace HID { namespace Windows
 				int32_t calibrated_center  = 1 << (axis_cap.BitSize - 1);
 				wchar_t const * di_name = L"";
 				
-				// Wurden Kalibrierungsdaten oder Name überschrieben?
-				//for (auto & mapping : dInputAxisMapping) {
-				//	if (currentClass.UsagePage == mapping.usagePage && currentUsage == mapping.usage) {
-				//		toName = mapping.name;
-				//		isCalibrated = mapping.isCalibrated;
-				//		if (mapping.isCalibrated) {
-				//			calibratedMinimum = mapping.calibration.lMin;
-				//			calibratedCenter = mapping.calibration.lCenter;
-				//			calibratedMaximum = mapping.calibration.lMax;
-				//		}
-				//
-				//		mapping.usage = 0; // Optimierung: bei zukünfigen Durchläufen überspringen
-				//		break;
-				//	}
-				//}
+				for (auto & mapping : di_axis_mapping) {
+					if (axis_cap.UsagePage == mapping.usagePage && current_usage == mapping.usage) {
+						di_name = mapping.name;
+						is_calibrated = mapping.isCalibrated;
+						if (mapping.isCalibrated) {
+							calibrated_minimum = mapping.calibration.lMin;
+							calibrated_center = mapping.calibration.lCenter;
+							calibrated_maximum = mapping.calibration.lMax;
+						}
+				
+						// Skip this mapping in following runs
+						mapping.usage = 0;
+						break;
+					}
+				}
 
 				Axis axis;
 				axis.usagePage = axis_cap.UsagePage;

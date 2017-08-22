@@ -134,19 +134,21 @@ namespace Vcl { namespace HID { namespace Windows
 
 		/// Map buttons and fetch calibration data
 		/// @param button_caps
-		void calibrateButtons(std::vector<HIDP_BUTTON_CAPS>& button_caps);
+		/// @param mapping Direct Input related remapping of buttons
+		void calibrateButtons(std::vector<HIDP_BUTTON_CAPS>& button_caps, gsl::span<struct DirectInputButtonMapping> mapping);
 
 		/// Map axes and fetch calibration data
 		/// @param axes_caps
-		void calibrateAxes(std::vector<HIDP_VALUE_CAPS>& axes_caps);
+		void calibrateAxes(std::vector<HIDP_VALUE_CAPS>& axes_caps, gsl::span<struct DirectInputAxisMapping> mapping);
 
 		/// Convert and store the button caps
 		/// @param button_caps
-		void storeButtons(std::vector<HIDP_BUTTON_CAPS>&& button_caps);
+		/// @param mapping Direct Input related remapping of buttons
+		void storeButtons(std::vector<HIDP_BUTTON_CAPS>&& button_caps, gsl::span<struct DirectInputButtonMapping> mapping);
 
 		/// Convert and store the axes caps
 		/// @param axes_caps
-		void storeAxes(std::vector<HIDP_VALUE_CAPS>&& axes_caps);
+		void storeAxes(std::vector<HIDP_VALUE_CAPS>&& axes_caps, gsl::span<struct DirectInputAxisMapping> mapping);
 
 	private:
 		/// Handle provided by the raw input API
