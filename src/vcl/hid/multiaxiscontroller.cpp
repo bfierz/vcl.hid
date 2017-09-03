@@ -22,55 +22,55 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "joystick.h"
+#include "multiaxiscontroller.h"
 
 // VCL
 #include <vcl/core/contract.h>
 
 namespace Vcl { namespace HID
 {
-	Joystick::Joystick()
-	: Device(DeviceType::Joystick)
+	MultiAxisController::MultiAxisController()
+	: Device(DeviceType::MultiAxisController)
 	{
 		_axes.assign(0);
 	}
 
-	uint32_t Joystick::nrAxes() const
+	uint32_t MultiAxisController::nrAxes() const
 	{
 		return _nrAxes;
 	}
-	void Joystick::setNrAxes(uint32_t nr_axes)
+	void MultiAxisController::setNrAxes(uint32_t nr_axes)
 	{
 		_nrAxes = nr_axes;
 	}
 
-	uint32_t Joystick::nrButtons() const
+	uint32_t MultiAxisController::nrButtons() const
 	{
 		return _nrButtons;
 	}
-	void Joystick::setNrButtons(uint32_t nr_buttons)
+	void MultiAxisController::setNrButtons(uint32_t nr_buttons)
 	{
 		_nrButtons = nr_buttons;
 	}
 
-	float Joystick::axisState(uint32_t axis) const
+	float MultiAxisController::axisState(uint32_t axis) const
 	{
 		return _axes[axis];
 	}
 
-	void Joystick::setAxisState(uint32_t axis, float state)
+	void MultiAxisController::setAxisState(uint32_t axis, float state)
 	{
 		_axes[axis] = state;
 	}
 
-	bool Joystick::buttonState(uint32_t idx) const
+	bool MultiAxisController::buttonState(uint32_t idx) const
 	{
 		VclRequire(idx < std::min(32u, nrButtons()), "Button index is valid.");
 
 		return _buttons[idx];
 	}
 
-	void Joystick::setButtonStates(std::bitset<32>&& states)
+	void MultiAxisController::setButtonStates(std::bitset<32>&& states)
 	{
 		_buttons = states;
 	}

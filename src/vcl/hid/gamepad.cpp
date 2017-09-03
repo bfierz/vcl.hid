@@ -65,7 +65,7 @@ namespace Vcl { namespace HID
 
 	bool Gamepad::buttonState(uint32_t idx) const
 	{
-		Require(idx < std::min(32u, nrButtons()), "Button index is valid.");
+		VclRequire(idx < std::min(32u, nrButtons()), "Button index is valid.");
 
 		return _buttons[idx];
 	}
@@ -77,7 +77,7 @@ namespace Vcl { namespace HID
 
 	void Gamepad::setHatState(uint32_t state)
 	{
-		Require(state < 9, "Hat state is valid.");
+		VclRequire(state < 9, "Hat state is valid.");
 
 		_hat = static_cast<GamepadHat>(state);
 	}

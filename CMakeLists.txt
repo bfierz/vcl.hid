@@ -3,9 +3,12 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.6)
 PROJECT(vcl.hid)
 
 # Configure the VCL compilation environment
+SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/vcl/src/cmake")
 INCLUDE(externals/vcl/src/cmake/VCLConfig.cmake)
 
 # External libraries
+SET(EIGEN3_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/externals/vcl/src/externals/eigen")
+
 SUBDIRS(externals/vcl/src/externals/gsl)
 SET(GSL_TEST OFF CACHE BOOL "" FORCE)
 SUBDIRS(externals/vcl/src/externals/fmtlib)
@@ -24,11 +27,13 @@ SET(VCL_HID_INC
 	src/vcl/hid/device.h
 	src/vcl/hid/gamepad.h
 	src/vcl/hid/joystick.h
+	src/vcl/hid/multiaxiscontroller.h
 )
 SET(VCL_HID_SRC
 	src/vcl/hid/device.cpp
 	src/vcl/hid/gamepad.cpp
 	src/vcl/hid/joystick.cpp
+	src/vcl/hid/multiaxiscontroller.cpp
 )
 
 SET(SOURCE

@@ -33,9 +33,63 @@
 
 // VCL
 #include <vcl/core/contract.h>
-#include <vcl/hid/joystick.h>
 #include <vcl/hid/gamepad.h>
+#include <vcl/hid/joystick.h>
+#include <vcl/hid/multiaxiscontroller.h>
 #include <vcl/util/scopeguard.h>
+
+// Missing typedef from Windows API
+typedef unsigned __int64 QWORD;
+
+namespace
+{
+	//! Workaround for incorrect alignment of the RAWINPUT structure on x64 os
+	//! when running as Wow64.
+	UINT getRawInputBuffer(HWND hWnd, PRAWINPUT pData, PUINT pcbSize, UINT cbSizeHeader)
+	{
+#ifdef VCL_ABI_WIN64
+		return ::GetRawInputBuffer(pData, pcbSize, cbSizeHeader);
+#else
+		BOOL is_wow_64 = FALSE;
+		::IsWow64Process(GetCurrentProcess(), &is_wow_64);
+		if (!is_wow_64 || pData == NULL)
+			return ::GetRawInputBuffer(pData, pcbSize, cbSizeHeader);
+		else
+		{
+			UINT cbDataSize=0;
+			UINT nCount=0;
+			PRAWINPUT pri = pData;
+
+			MSG msg;
+			while (PeekMessage(&msg, hWnd, WM_INPUT, WM_INPUT, PM_NOREMOVE))
+			{
+				HRAWINPUT hRawInput = reinterpret_cast<HRAWINPUT>(msg.lParam);
+				UINT cbSize = *pcbSize - cbDataSize;
+				if (::GetRawInputData(hRawInput, RID_INPUT, pri, &cbSize, cbSizeHeader) == static_cast<UINT>(-1))
+				{
+					if (nCount==0)
+						return static_cast<UINT>(-1);
+					else
+						break;
+				}
+				++nCount;
+
+				// Remove the message for the data just read
+				PeekMessage(&msg, hWnd, WM_INPUT, WM_INPUT, PM_REMOVE);
+
+				pri = NEXTRAWINPUTBLOCK(pri);
+				cbDataSize = reinterpret_cast<ULONG_PTR>(pri) - reinterpret_cast<ULONG_PTR>(pData);
+				if (cbDataSize >= *pcbSize)
+				{
+					cbDataSize = *pcbSize;
+					break;
+				}
+			}
+			return nCount;
+		}
+#endif
+	}
+}
 
 namespace Vcl { namespace HID { namespace Windows
 {
@@ -307,8 +361,6 @@ namespace Vcl { namespace HID { namespace Windows
 			for (size_t i = 0; i < sizeof(di_axis_mapping) / sizeof(di_axis_mapping[0]); ++i)
 			{
 				path[121] = wchar_t('0' + i);
-
-				bool success = false;
 
 				HKEY key = nullptr;
 				if (0 == RegOpenKeyExW(HKEY_CURRENT_USER, path, 0u, KEY_READ, &key))
@@ -652,7 +704,7 @@ namespace Vcl { namespace HID { namespace Windows
 					setHatState(value);
 					break;
 				default:
-					DebugError("Not implemented");
+					VclDebugError("Not implemented");
 				}
 			}
 		}
@@ -679,6 +731,26 @@ namespace Vcl { namespace HID { namespace Windows
 		setButtonStates(std::move(button_states));
 
 		return true;
+	}
+	
+	template<typename ControllerType>
+	MultiAxisControllerHID<ControllerType>::MultiAxisControllerHID(HANDLE raw_handle)
+	: GenericHID(raw_handle)
+	, ControllerType()
+	, Device(DeviceType::MultiAxisController)
+	{
+		setNrAxes(axes().size());
+		setNrButtons(buttons().size());
+	}
+	
+	template<typename ControllerType>
+	bool MultiAxisControllerHID<ControllerType>::processInput(PRAWINPUT raw_input)
+	{
+		// We are not interested in keyboard or mouse data received via raw input
+		if (raw_input->header.dwType != RIM_TYPEHID)
+			return false;
+
+		return false;
 	}
 
 	DeviceManager::DeviceManager()
@@ -732,6 +804,10 @@ namespace Vcl { namespace HID { namespace Windows
 					case 0x05:
 						_devices.emplace_back(std::make_unique<GamepadHID<Gamepad>>(desc.hDevice));
 						break;
+						
+					case 0x08:
+						_devices.emplace_back(std::make_unique<MultiAxisControllerHID<MultiAxisController>>(desc.hDevice));
+						break;
 
 					default:
 						_devices.emplace_back(std::make_unique<GenericHID>(desc.hDevice));
@@ -749,7 +825,34 @@ namespace Vcl { namespace HID { namespace Windows
 		return gsl::make_span<Device const* const>(ptr, _deviceLinks.size());
 	}
 
-	void DeviceManager::registerDevices(Flags<DeviceType> device_types, HWND hWnd)
+	bool DeviceManager::poll()
+	{
+		UINT input_buffer_size;
+		if (GetRawInputBuffer(nullptr, &input_buffer_size, sizeof(RAWINPUTHEADER)) != 0)
+			return false;
+
+		auto raw_input_buffer = std::make_unique<RAWINPUT[]>(input_buffer_size);
+		auto raw_input = raw_input_buffer.get();
+		UINT nr_buffers = GetRawInputBuffer(raw_input, &input_buffer_size, sizeof(RAWINPUTHEADER));
+
+		for (UINT i = 0; i < nr_buffers; i++)
+		{
+			// Pass the input data to the correct device
+			auto dev_it = std::find_if(_devices.begin(), _devices.end(), [&raw_input](const auto& device)
+			{
+				return device->rawHandle() == raw_input->header.hDevice;
+			});
+
+			if (dev_it != _devices.end())
+				(*dev_it)->processInput(raw_input);
+			
+			raw_input = NEXTRAWINPUTBLOCK(raw_input);
+		}
+
+		return true;
+	}
+	
+	void DeviceManager::registerDevices(Flags<DeviceType> device_types, HWND window_handle)
 	{
 		std::vector<RAWINPUTDEVICE> input_requests;
 		input_requests.reserve(DeviceType::Count);
@@ -761,19 +864,19 @@ namespace Vcl { namespace HID { namespace Windows
 				switch (1 << i)
 				{
 				case DeviceType::Mouse:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x02, RIDEV_INPUTSINK | RIDEV_NOLEGACY, hWnd });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x02, RIDEV_INPUTSINK | RIDEV_NOLEGACY, window_handle });
 					break;
 				case DeviceType::Keyboard:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x06, RIDEV_INPUTSINK | RIDEV_NOLEGACY, hWnd });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x06, RIDEV_INPUTSINK | RIDEV_NOLEGACY, window_handle });
 					break;
 				case DeviceType::Joystick:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x04, RIDEV_INPUTSINK, hWnd });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x04, RIDEV_INPUTSINK, window_handle });
 					break;
 				case DeviceType::Gamepad:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x05, RIDEV_INPUTSINK, hWnd });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x05, RIDEV_INPUTSINK, window_handle });
 					break;
 				case DeviceType::MultiAxisController:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x08, RIDEV_INPUTSINK, hWnd });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x08, RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, window_handle });
 					break;
 				}
 			}
@@ -786,6 +889,8 @@ namespace Vcl { namespace HID { namespace Windows
 
 	bool DeviceManager::processInput(HWND window_handle, UINT message, WPARAM wide_param, LPARAM low_param)
 	{
+		VclRequire(message == WM_INPUT, "Is called while processing WM_INPUT");
+
 		// Format the Windows message parameters
 		UINT input_code = static_cast<UINT>(GET_RAWINPUT_CODE_WPARAM(wide_param)); // 0 - foreground, 1 - background
 		HRAWINPUT raw_input_handle = reinterpret_cast<HRAWINPUT>(low_param);

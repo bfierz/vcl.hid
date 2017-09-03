@@ -46,7 +46,7 @@ namespace Vcl { namespace HID
 	);
 
 	/*!
-	 *
+	 *	Basic abstraction of a HID device
 	 */
 	class Device
 	{

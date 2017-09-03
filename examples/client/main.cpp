@@ -32,8 +32,9 @@
 
 // VCL
 #include <vcl/hid/windows/hid.h>
-#include <vcl/hid/joystick.h>
 #include <vcl/hid/gamepad.h>
+#include <vcl/hid/joystick.h>
+#include <vcl/hid/multiaxiscontroller.h>
 
 Vcl::HID::Windows::DeviceManager manager;
 
@@ -123,6 +124,33 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 					break;
 				}
+				case DeviceType::MultiAxisController:
+				{
+					output << L"MultiAxisController ";
+
+					auto gamepad = dynamic_cast<const MultiAxisController*>(dev);
+					for (size_t i = 0; i < gamepad->nrAxes(); i++)
+					{
+						auto state = gamepad->axisState(i);
+						output << state << L" ";
+					}
+
+					for (size_t i = 0; i < gamepad->nrButtons(); i++)
+					{
+						auto pressed = gamepad->buttonState(i);
+						if (pressed)
+						{
+							output << L"1 ";
+						}
+						else
+						{
+							output << L"0 ";
+						}
+					}
+					output << L"\n";
+
+					break;
+				}
 				}
 
 				DWORD written = 0;
@@ -162,7 +190,11 @@ int main(char** argv, int argc)
 
 	auto hWnd = CreateWindowExW(0, wc.lpszClassName, L"RawInputTest", 0, 0, 0, 0, 0, HWND_MESSAGE, 0, 0, 0);
 
-	manager.registerDevices(Vcl::HID::DeviceType::Joystick | Vcl::HID::DeviceType::Gamepad, hWnd);
+	manager.registerDevices(
+		Vcl::HID::DeviceType::Joystick | 
+		Vcl::HID::DeviceType::Gamepad |
+		Vcl::HID::DeviceType::MultiAxisController,
+		hWnd);
 
 	// Write the header
 	HANDLE std_out = GetStdHandle(STD_OUTPUT_HANDLE);

@@ -32,8 +32,9 @@
 
 // VCL
 #include <vcl/hid/windows/hid.h>
-#include <vcl/hid/joystick.h>
 #include <vcl/hid/gamepad.h>
+#include <vcl/hid/joystick.h>
+#include <vcl/hid/multiaxiscontroller.h>
 
 int main(char** argv, int argc)
 {
@@ -41,13 +42,14 @@ int main(char** argv, int argc)
 	using Vcl::HID::DeviceType;
 	using Vcl::HID::Joystick;
 	using Vcl::HID::Gamepad;
+	using Vcl::HID::MultiAxisController;
 
 	Vcl::HID::Windows::DeviceManager manager;
 
 	const auto devs = manager.devices();
 	for (auto dev : devs)
 	{
-		std::wcout << dev->vendorName() << L", " << dev->deviceName() << L"\n";
+		std::wcout << dev->type() << L", " << dev->vendorName() << L", " << dev->deviceName() << L"\n";
 		switch (dev->type())
 		{
 		case DeviceType::Joystick:
@@ -58,8 +60,14 @@ int main(char** argv, int argc)
 
 		case DeviceType::Gamepad:
 
-			std::wcout << L"Number of axes: "    << dynamic_cast<const Joystick*>(dev)->nrAxes() << L"\n";
-			std::wcout << L"Number of buttons: " << dynamic_cast<const Joystick*>(dev)->nrButtons() << L"\n";
+			std::wcout << L"Number of axes: "    << dynamic_cast<const Gamepad*>(dev)->nrAxes() << L"\n";
+			std::wcout << L"Number of buttons: " << dynamic_cast<const Gamepad*>(dev)->nrButtons() << L"\n";
+			break;
+
+		case DeviceType::MultiAxisController:
+
+			std::wcout << L"Number of axes: "    << dynamic_cast<const MultiAxisController*>(dev)->nrAxes() << L"\n";
+			std::wcout << L"Number of buttons: " << dynamic_cast<const MultiAxisController*>(dev)->nrButtons() << L"\n";
 			break;
 		}
 

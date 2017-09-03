@@ -22,56 +22,48 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "joystick.h"
+#pragma once
+
+// VCL configuration
+#include <vcl/config/global.h>
+
+// C++ Standard library
+#include <array>
+#include <bitset>
 
 // VCL
-#include <vcl/core/contract.h>
+#include <vcl/hid/device.h>
 
 namespace Vcl { namespace HID
 {
-	Joystick::Joystick()
-	: Device(DeviceType::Joystick)
+	class MultiAxisController : public virtual Device
 	{
-		_axes.assign(0);
-	}
+	public:
+		MultiAxisController();
 
-	uint32_t Joystick::nrAxes() const
-	{
-		return _nrAxes;
-	}
-	void Joystick::setNrAxes(uint32_t nr_axes)
-	{
-		_nrAxes = nr_axes;
-	}
+		uint32_t nrAxes() const;
+		uint32_t nrButtons() const;
 
-	uint32_t Joystick::nrButtons() const
-	{
-		return _nrButtons;
-	}
-	void Joystick::setNrButtons(uint32_t nr_buttons)
-	{
-		_nrButtons = nr_buttons;
-	}
+		float axisState(uint32_t axis) const;
+		bool buttonState(uint32_t idx) const;
 
-	float Joystick::axisState(uint32_t axis) const
-	{
-		return _axes[axis];
-	}
+	protected:
+		void setNrAxes(uint32_t nr_axes);
+		void setNrButtons(uint32_t nr_buttons);
+		void setAxisState(uint32_t axis, float state);
+		void setButtonStates(std::bitset<32>&& states);
 
-	void Joystick::setAxisState(uint32_t axis, float state)
-	{
-		_axes[axis] = state;
-	}
+	private:
+		/// Number of reported axes
+		uint32_t _nrAxes{ 0 };
 
-	bool Joystick::buttonState(uint32_t idx) const
-	{
-		VclRequire(idx < std::min(32u, nrButtons()), "Button index is valid.");
+		/// Number of reported buttons
+		uint32_t _nrButtons{ 0 };
 
-		return _buttons[idx];
-	}
+		/// Axes states
+		std::array<float, 8> _axes;
 
-	void Joystick::setButtonStates(std::bitset<32>&& states)
-	{
-		_buttons = states;
-	}
+		/// Buttons states
+		std::bitset<32> _buttons;
+	};
 }}
