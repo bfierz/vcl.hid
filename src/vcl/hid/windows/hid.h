@@ -106,17 +106,20 @@ namespace Vcl { namespace HID { namespace Windows
 		std::wstring name;
 	};
 
-	class GenericHID : public virtual Device
+	class GenericHID
 	{
 	public:
 		GenericHID(HANDLE raw_handle);
 
 		HANDLE rawHandle() const { return _rawInputHandle; }
 
-		virtual bool processInput(PRAWINPUT raw_input);
-
-	protected:
+		//! Access the windows internal handle
+		//! \returns The file handle to the device
 		HANDLE fileHandle() const { return _fileHandle; }
+
+		//! Read the device name from the hardware
+		//! \returns The vendor defined names (vendor, product)
+		auto readDeviceName() const -> std::pair<std::wstring, std::wstring>;
 
 		const std::vector<Axis>& axes() const { return _axes; }
 		const std::vector<Button>& buttons() const { return _buttons; }
@@ -125,10 +128,7 @@ namespace Vcl { namespace HID { namespace Windows
 		const std::vector<HIDP_BUTTON_CAPS>& buttonCaps() const { return _buttonCaps; }
 
 	private:
-		//! Read the device name from the hardware
-		//! \returns the vendor defined name
-		auto readDeviceName() const -> std::pair<std::wstring, std::wstring>;
-
+		
 		//! Read the device capabilities
 		auto readDeviceCaps() const -> std::tuple<std::vector<HIDP_BUTTON_CAPS>, std::vector<HIDP_VALUE_CAPS>>;
 
@@ -169,30 +169,44 @@ namespace Vcl { namespace HID { namespace Windows
 		//! HID axis representation
 		std::vector<HIDP_VALUE_CAPS> _axesCaps;
 	};
-
-	template<typename JoystickType>
-	class JoystickHID : public GenericHID, public JoystickType
+	
+	class AbstractHID
 	{
 	public:
-		JoystickHID(HANDLE raw_handle);
+		AbstractHID(std::unique_ptr<GenericHID> device) : _device{ std::move(device) } {}
+
+		const GenericHID* device() const { return _device.get(); }
+
+		virtual bool processInput(PRAWINPUT raw_input) = 0;
+
+	private:
+		//! Actual hardware device implementation
+		std::unique_ptr<GenericHID> _device;
+	};
+
+	template<typename JoystickType>
+	class JoystickHID : public AbstractHID, public JoystickType
+	{
+	public:
+		JoystickHID(std::unique_ptr<GenericHID> device);
 
 		bool processInput(PRAWINPUT raw_input) override;
 	};
 
 	template<typename GamepadType>
-	class GamepadHID : public GenericHID, public GamepadType
+	class GamepadHID : public AbstractHID, public GamepadType
 	{
 	public:
-		GamepadHID(HANDLE raw_handle);
+		GamepadHID(std::unique_ptr<GenericHID> device);
 
 		bool processInput(PRAWINPUT raw_input) override;
 	};
 	
 	template<typename ControllerType>
-	class MultiAxisControllerHID : public GenericHID, public ControllerType
+	class MultiAxisControllerHID : public AbstractHID, public ControllerType
 	{
 	public:
-		MultiAxisControllerHID(HANDLE raw_handle);
+		MultiAxisControllerHID(std::unique_ptr<GenericHID> device);
 
 		bool processInput(PRAWINPUT raw_input) override;
 	};
@@ -222,7 +236,7 @@ namespace Vcl { namespace HID { namespace Windows
 
 	private:
 		//! List of Windows HID
-		std::vector<std::unique_ptr<GenericHID>> _devices;
+		std::vector<std::unique_ptr<AbstractHID>> _devices;
 
 		//! List of device pointers (links to `_devices`)
 		std::vector<Device*> _deviceLinks;

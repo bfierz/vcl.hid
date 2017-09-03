@@ -111,10 +111,8 @@ namespace Vcl { namespace HID { namespace Windows
 		wchar_t              name[32];
 	};
 
-
 	GenericHID::GenericHID(HANDLE raw_handle)
-	: Device(DeviceType::Undefined)
-	, _rawInputHandle(raw_handle)
+	: _rawInputHandle(raw_handle)
 	{
 		// Access the object path of the device name
 		wchar_t path_buffer[260 + 4];
@@ -140,10 +138,6 @@ namespace Vcl { namespace HID { namespace Windows
 			return;
 		}
 
-		const auto names = readDeviceName();
-		setVendorName(names.first);
-		setDeviceName(names.second);
-
 		auto caps = readDeviceCaps();
 
 		DirectInputButtonMapping di_button_mapping[128] = {};
@@ -154,11 +148,6 @@ namespace Vcl { namespace HID { namespace Windows
 
 		storeButtons(std::move(std::get<0>(caps)), di_button_mapping);
 		storeAxes(   std::move(std::get<1>(caps)), di_axis_mapping);
-	}
-
-	bool GenericHID::processInput(PRAWINPUT raw_input)
-	{
-		return false;
 	}
 
 	auto GenericHID::readDeviceName() const -> std::pair<std::wstring, std::wstring>
@@ -560,20 +549,25 @@ namespace Vcl { namespace HID { namespace Windows
 	}
 
 	template<typename JoystickType>
-	JoystickHID<JoystickType>::JoystickHID(HANDLE raw_handle)
-	: GenericHID(raw_handle)
+	JoystickHID<JoystickType>::JoystickHID(std::unique_ptr<GenericHID> dev)
+	: AbstractHID{std::move(dev)}
 	, JoystickType()
-	, Device(DeviceType::Joystick)
 	{
-		setNrAxes(axes().size());
-		setNrButtons(buttons().size());
+		static_assert(std::is_base_of<Joystick, JoystickType>::value, "JoystickType must be a joystick");
+		
+		const auto names = device()->readDeviceName();
+		setVendorName(names.first);
+		setDeviceName(names.second);
+
+		setNrAxes(device()->axes().size());
+		setNrButtons(device()->buttons().size());
 	}
 
 	template<typename JoystickType>
 	bool JoystickHID<JoystickType>::processInput(PRAWINPUT raw_input)
 	{
 		PHIDP_PREPARSED_DATA preparsed_data;
-		if (HidD_GetPreparsedData(fileHandle(), &preparsed_data) == FALSE)
+		if (HidD_GetPreparsedData(device()->fileHandle(), &preparsed_data) == FALSE)
 		{
 			return{};
 		}
@@ -581,7 +575,7 @@ namespace Vcl { namespace HID { namespace Windows
 		// Free the allocated data structure at the end of the method
 		VCL_SCOPE_EXIT{ HidD_FreePreparsedData(preparsed_data); };
 
-		for (const auto& axis : axes())
+		for (const auto& axis : device()->axes())
 		{
 			// Read the value of the axis
 			ULONG value = 0;
@@ -624,7 +618,7 @@ namespace Vcl { namespace HID { namespace Windows
 
 		USAGE usages[128];
 		ULONG nr_usages = 128;
-		for (const auto& button_caps : buttonCaps())
+		for (const auto& button_caps : device()->buttonCaps())
 		{
 			if (HidP_GetUsages(
 				HidP_Input, button_caps.UsagePage, 0,
@@ -644,13 +638,18 @@ namespace Vcl { namespace HID { namespace Windows
 	}
 
 	template<typename GamepadType>
-	GamepadHID<GamepadType>::GamepadHID(HANDLE raw_handle)
-	: GenericHID(raw_handle)
+	GamepadHID<GamepadType>::GamepadHID(std::unique_ptr<GenericHID> dev)
+	: AbstractHID{std::move(dev)}
 	, GamepadType()
-	, Device(DeviceType::Gamepad)
 	{
-		setNrAxes(axes().size());
-		setNrButtons(buttons().size());
+		static_assert(std::is_base_of<Gamepad, GamepadType>::value, "GamepadType must be a gamepad");
+		
+		const auto names = device()->readDeviceName();
+		setVendorName(names.first);
+		setDeviceName(names.second);
+
+		setNrAxes(device()->axes().size());
+		setNrButtons(device()->buttons().size());
 	}
 
 	template<typename GamepadType>
@@ -661,7 +660,7 @@ namespace Vcl { namespace HID { namespace Windows
 			return false;
 
 		PHIDP_PREPARSED_DATA preparsed_data;
-		if (HidD_GetPreparsedData(fileHandle(), &preparsed_data) == FALSE)
+		if (HidD_GetPreparsedData(device()->fileHandle(), &preparsed_data) == FALSE)
 		{
 			return{};
 		}
@@ -669,7 +668,7 @@ namespace Vcl { namespace HID { namespace Windows
 		// Free the allocated data structure at the end of the method
 		VCL_SCOPE_EXIT{ HidD_FreePreparsedData(preparsed_data); };
 
-		for (const auto& axis : axes())
+		for (const auto& axis : device()->axes())
 		{
 			// Read the value of the axis
 			ULONG value = 0;
@@ -714,7 +713,7 @@ namespace Vcl { namespace HID { namespace Windows
 
 		USAGE usages[128];
 		ULONG nr_usages = 128;
-		for (const auto& button_caps : buttonCaps())
+		for (const auto& button_caps : device()->buttonCaps())
 		{
 			if (HidP_GetUsages(
 				HidP_Input, button_caps.UsagePage, 0,
@@ -734,13 +733,18 @@ namespace Vcl { namespace HID { namespace Windows
 	}
 	
 	template<typename ControllerType>
-	MultiAxisControllerHID<ControllerType>::MultiAxisControllerHID(HANDLE raw_handle)
-	: GenericHID(raw_handle)
+	MultiAxisControllerHID<ControllerType>::MultiAxisControllerHID(std::unique_ptr<GenericHID> dev)
+	: AbstractHID{std::move(dev)}
 	, ControllerType()
-	, Device(DeviceType::MultiAxisController)
 	{
-		setNrAxes(axes().size());
-		setNrButtons(buttons().size());
+		static_assert(std::is_base_of<MultiAxisController, ControllerType>::value, "ControllerType must be a multi-axis controller");
+		
+		const auto names = device()->readDeviceName();
+		setVendorName(names.first);
+		setDeviceName(names.second);
+
+		setNrAxes(device()->axes().size());
+		setNrButtons(device()->buttons().size());
 	}
 	
 	template<typename ControllerType>
@@ -795,25 +799,30 @@ namespace Vcl { namespace HID { namespace Windows
 			{
 				if (dev_info.hid.usUsagePage == 1)
 				{
+					// Instantiate the generic HID and pass it to the actual
+					// implemenation.
+					auto hid = std::make_unique<GenericHID>(desc.hDevice);
+
 					switch (dev_info.hid.usUsage)
 					{
 					case 0x04:
-						_devices.emplace_back(std::make_unique<JoystickHID<Joystick>>(desc.hDevice));
+					{
+						_devices.emplace_back(std::make_unique<JoystickHID<Joystick>>(std::move(hid)));
 						break;
-
+					}
 					case 0x05:
-						_devices.emplace_back(std::make_unique<GamepadHID<Gamepad>>(desc.hDevice));
+					{
+						_devices.emplace_back(std::make_unique<GamepadHID<Gamepad>>(std::move(hid)));
 						break;
-						
+					}
 					case 0x08:
-						_devices.emplace_back(std::make_unique<MultiAxisControllerHID<MultiAxisController>>(desc.hDevice));
+					{
+						_devices.emplace_back(std::make_unique<MultiAxisControllerHID<MultiAxisController>>(std::move(hid)));
 						break;
-
-					default:
-						_devices.emplace_back(std::make_unique<GenericHID>(desc.hDevice));
+					}
 					}
 					// Store a link to the created device for external use
-					_deviceLinks.emplace_back(static_cast<Device*>(_devices.back().get()));
+					_deviceLinks.emplace_back(dynamic_cast<Device*>(_devices.back().get()));
 				}
 			}
 		}
@@ -840,7 +849,7 @@ namespace Vcl { namespace HID { namespace Windows
 			// Pass the input data to the correct device
 			auto dev_it = std::find_if(_devices.begin(), _devices.end(), [&raw_input](const auto& device)
 			{
-				return device->rawHandle() == raw_input->header.hDevice;
+				return device->device()->rawHandle() == raw_input->header.hDevice;
 			});
 
 			if (dev_it != _devices.end())
@@ -911,7 +920,7 @@ namespace Vcl { namespace HID { namespace Windows
 		// Pass the input data to the correct device
 		auto dev_it = std::find_if(_devices.begin(), _devices.end(), [&raw_input](const auto& device)
 		{
-			return device->rawHandle() == raw_input->header.hDevice;
+			return device->device()->rawHandle() == raw_input->header.hDevice;
 		});
 
 		bool processed = false;

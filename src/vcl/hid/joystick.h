@@ -46,7 +46,7 @@ namespace Vcl { namespace HID
 		RZ
 	};
 
-	class Joystick : public virtual Device
+	class Joystick : public Device
 	{
 	public:
 		Joystick();

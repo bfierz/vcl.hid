@@ -59,7 +59,7 @@ namespace Vcl { namespace HID
 		NW
 	};
 
-	class Gamepad : public virtual Device
+	class Gamepad : public Device
 	{
 	public:
 		Gamepad();

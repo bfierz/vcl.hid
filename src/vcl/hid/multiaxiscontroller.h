@@ -36,7 +36,7 @@
 
 namespace Vcl { namespace HID
 {
-	class MultiAxisController : public virtual Device
+	class MultiAxisController : public Device
 	{
 	public:
 		MultiAxisController();
