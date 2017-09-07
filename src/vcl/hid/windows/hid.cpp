@@ -33,6 +33,7 @@
 
 // VCL
 #include <vcl/core/contract.h>
+#include <vcl/hid/windows/spacenavigator.h>
 #include <vcl/hid/gamepad.h>
 #include <vcl/hid/joystick.h>
 #include <vcl/hid/multiaxiscontroller.h>
@@ -136,6 +137,18 @@ namespace Vcl { namespace HID { namespace Windows
 		if (_fileHandle == INVALID_HANDLE_VALUE)
 		{
 			return;
+		}
+		
+		// Read the device info in order to determine the exact device type
+		RID_DEVICE_INFO dev_info = {};
+		dev_info.cbSize = sizeof(RID_DEVICE_INFO);
+
+		UINT dev_info_size = sizeof(RID_DEVICE_INFO);
+		bytes_copied = GetRawInputDeviceInfoW(_rawInputHandle, RIDI_DEVICEINFO, &dev_info, &dev_info_size);
+		if (bytes_copied == sizeof(RID_DEVICE_INFO))
+		{
+			_vendorId = dev_info.hid.dwVendorId;
+			_productId = dev_info.hid.dwProductId;
 		}
 
 		auto caps = readDeviceCaps();
@@ -564,7 +577,7 @@ namespace Vcl { namespace HID { namespace Windows
 	}
 
 	template<typename JoystickType>
-	bool JoystickHID<JoystickType>::processInput(PRAWINPUT raw_input)
+	bool JoystickHID<JoystickType>::processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input)
 	{
 		PHIDP_PREPARSED_DATA preparsed_data;
 		if (HidD_GetPreparsedData(device()->fileHandle(), &preparsed_data) == FALSE)
@@ -653,7 +666,7 @@ namespace Vcl { namespace HID { namespace Windows
 	}
 
 	template<typename GamepadType>
-	bool GamepadHID<GamepadType>::processInput(PRAWINPUT raw_input)
+	bool GamepadHID<GamepadType>::processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input)
 	{
 		// We are not interested in keyboard or mouse data received via raw input
 		if (raw_input->header.dwType != RIM_TYPEHID)
@@ -748,7 +761,7 @@ namespace Vcl { namespace HID { namespace Windows
 	}
 	
 	template<typename ControllerType>
-	bool MultiAxisControllerHID<ControllerType>::processInput(PRAWINPUT raw_input)
+	bool MultiAxisControllerHID<ControllerType>::processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input)
 	{
 		// We are not interested in keyboard or mouse data received via raw input
 		if (raw_input->header.dwType != RIM_TYPEHID)
@@ -756,7 +769,7 @@ namespace Vcl { namespace HID { namespace Windows
 
 		return false;
 	}
-
+	
 	DeviceManager::DeviceManager()
 	{
 		// Get a list of all devices provided by the raw input API
@@ -817,7 +830,16 @@ namespace Vcl { namespace HID { namespace Windows
 					}
 					case 0x08:
 					{
-						_devices.emplace_back(std::make_unique<MultiAxisControllerHID<MultiAxisController>>(std::move(hid)));
+						const auto names = hid->readDeviceName();
+						if (dev_info.hid.dwVendorId == SpaceNavigator::LogitechVendorID &&
+							names.first == L"3Dconnexion" && names.second == L"SpaceNavigator")
+						{
+							_devices.emplace_back(std::make_unique<SpaceNavigatorHID>(std::move(hid)));
+						}
+						else
+						{
+							_devices.emplace_back(std::make_unique<MultiAxisControllerHID<MultiAxisController>>(std::move(hid)));
+						}
 						break;
 					}
 					}
@@ -834,7 +856,7 @@ namespace Vcl { namespace HID { namespace Windows
 		return gsl::make_span<Device const* const>(ptr, _deviceLinks.size());
 	}
 
-	bool DeviceManager::poll()
+	bool DeviceManager::poll(HWND window_handle, UINT input_code)
 	{
 		UINT input_buffer_size;
 		if (GetRawInputBuffer(nullptr, &input_buffer_size, sizeof(RAWINPUTHEADER)) != 0)
@@ -853,8 +875,11 @@ namespace Vcl { namespace HID { namespace Windows
 			});
 
 			if (dev_it != _devices.end())
-				(*dev_it)->processInput(raw_input);
+				(*dev_it)->processInput(window_handle, input_code, raw_input);
 			
+			// Clean the buffer
+			::DefRawInputProc(&raw_input, 1, sizeof(RAWINPUTHEADER)); 
+
 			raw_input = NEXTRAWINPUTBLOCK(raw_input);
 		}
 
@@ -926,12 +951,15 @@ namespace Vcl { namespace HID { namespace Windows
 		bool processed = false;
 		if (dev_it != _devices.end())
 		{
-			processed = (*dev_it)->processInput(raw_input);
+			processed = (*dev_it)->processInput(window_handle, input_code, raw_input);
 		}
 
 		// Clean the buffer
 		::DefRawInputProc(&raw_input, 1, sizeof(RAWINPUTHEADER));
 		HeapFree(heap_handle, 0, raw_input);
+
+		// Check if any other input messages are still in the pipeline
+		poll(window_handle, input_code);
 
 		return processed;
 	}

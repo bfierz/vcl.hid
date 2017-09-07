@@ -18,9 +18,11 @@ SUBDIRS(externals/vcl/src/libs/vcl.core)
 
 SET(VCL_HID_WINDOWS_INC
 	src/vcl/hid/windows/hid.h
+	src/vcl/hid/windows/spacenavigator.h
 )
 SET(VCL_HID_WINDOWS_SRC
 	src/vcl/hid/windows/hid.cpp
+	src/vcl/hid/windows/spacenavigator.cpp
 )
 
 SET(VCL_HID_INC
@@ -28,12 +30,16 @@ SET(VCL_HID_INC
 	src/vcl/hid/gamepad.h
 	src/vcl/hid/joystick.h
 	src/vcl/hid/multiaxiscontroller.h
+	src/vcl/hid/spacenavigator.h
+	src/vcl/hid/spacenavigatorhandler.h
+	src/vcl/hid/spacenavigatorvirtualkeys.h
 )
 SET(VCL_HID_SRC
 	src/vcl/hid/device.cpp
 	src/vcl/hid/gamepad.cpp
 	src/vcl/hid/joystick.cpp
 	src/vcl/hid/multiaxiscontroller.cpp
+	src/vcl/hid/spacenavigator.cpp
 )
 
 SET(SOURCE

@@ -117,6 +117,14 @@ namespace Vcl { namespace HID { namespace Windows
 		//! \returns The file handle to the device
 		HANDLE fileHandle() const { return _fileHandle; }
 
+		//! Access the vendor ID
+		//! \returns The vendor ID
+		DWORD vendorId() const { return _vendorId; }
+
+		//! Access the product ID
+		//! \returns The product ID
+		DWORD productId() const { return _productId; }
+
 		//! Read the device name from the hardware
 		//! \returns The vendor defined names (vendor, product)
 		auto readDeviceName() const -> std::pair<std::wstring, std::wstring>;
@@ -157,6 +165,12 @@ namespace Vcl { namespace HID { namespace Windows
 		//! Handle from the file API
 		HANDLE _fileHandle{ nullptr };
 
+		//! Vendor ID
+		DWORD _vendorId;
+
+		//! Product ID
+		DWORD _productId;
+
 		//! Buttons associated with the device
 		std::vector<Button> _buttons;
 
@@ -177,7 +191,7 @@ namespace Vcl { namespace HID { namespace Windows
 
 		const GenericHID* device() const { return _device.get(); }
 
-		virtual bool processInput(PRAWINPUT raw_input) = 0;
+		virtual bool processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input) = 0;
 
 	private:
 		//! Actual hardware device implementation
@@ -190,7 +204,7 @@ namespace Vcl { namespace HID { namespace Windows
 	public:
 		JoystickHID(std::unique_ptr<GenericHID> device);
 
-		bool processInput(PRAWINPUT raw_input) override;
+		bool processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input) override;
 	};
 
 	template<typename GamepadType>
@@ -199,7 +213,7 @@ namespace Vcl { namespace HID { namespace Windows
 	public:
 		GamepadHID(std::unique_ptr<GenericHID> device);
 
-		bool processInput(PRAWINPUT raw_input) override;
+		bool processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input) override;
 	};
 	
 	template<typename ControllerType>
@@ -208,7 +222,7 @@ namespace Vcl { namespace HID { namespace Windows
 	public:
 		MultiAxisControllerHID(std::unique_ptr<GenericHID> device);
 
-		bool processInput(PRAWINPUT raw_input) override;
+		bool processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input) override;
 	};
 
 	class DeviceManager
@@ -224,12 +238,13 @@ namespace Vcl { namespace HID { namespace Windows
 		//! \param window_handle Handle to the window to which devices should be
 		//!                      registered.
 		void registerDevices(Flags<DeviceType> device_types, HWND window_handle);
-
+		
 		//! Polls all the devices instead of processing only a single device
+		//! \param window_handle Handle of the window calling this method
 		//! \returns True, if any device was successfully polled.
 		//! \note This method is implemented according to the documenation
 		//!       on MSDN. However, it seems not possible to call it.
-		bool poll();
+		bool poll(HWND window_handle, UINT input_code);
 
 		//! Process the input of a specific device
 		bool processInput(HWND window_handle, UINT message, WPARAM wide_param, LPARAM low_param);
