@@ -35,48 +35,44 @@
 
 namespace Vcl { namespace HID
 {
-	/// Forward declaration
+	//! Forward declaration
 	class SpaceNavigator;
 
+	//! Callback interface 
 	class SpaceNavigatorHandler
 	{
 	public:
-		//////////////////////////////////////////////////////////////////////////////////
-		// onSpaceMouseMove is invoked when new 3d mouse data is available.
-		// Override this method to process 3d mouse 6dof data in the application
-		// Input:
-		//    DeviceId device - the raw input device handle 
-		//                     this can be used to identify the device the data is coming
-		//                     from or simply ignored.
-		//
-		//    array<float, 6> motion_data - contains the displacement data, using
-		//                     a right-handed coordinate system with z down
-		//                     see 'Programing for the 3dmouse' document available at
-		//                     www.3dconnexion.com.
-		//                     aMotionData[0], aMotionData[1], aMotionData[2] is the
-		//                     incremental pan zoom displacement vector (x,y,z).
-		//                     aMotionData[3], aMotionData[4], aMotionData[5] is the
-		//                     incremental rotation vector (NOT Euler angles)
-		virtual void onSpaceMouseMove(const SpaceNavigator* device, std::array<float, 6> motion_data) = 0;
+		/*!
+		 * \brief onSpaceMouseMove is invoked when new 3d mouse data is
+		 *        available.
+		 * 
+		 * \param device      Pointer to the device that triggered the callback
+		 * \param motion_data Contains the displacement data, using a
+		 *                    right-handed coordinate system with z down.
+		 *                    See 'Programing for the 3dmouse' document
+		 *                    available at www.3dconnexion.com.
+		 *                    Entries 0, 1, 2 is the incremental pan zoom
+		 *                    displacement vector (x,y,z).
+		 *                    Entries 3, 4, 5 is the incremental rotation vector
+		 *                    (NOT Euler angles).
+		 */
+		virtual void onSpaceMouseMove(const SpaceNavigator* device, 
+			                          std::array<float, 6> motion_data) = 0;
 
-		//////////////////////////////////////////////////////////////////////////////////
-		// onSpaceMouseKeyDown processes the standard 3d mouse key presses
-		// This method can be overwritten
-		// Input:
-		//    DeviceId device - the raw input device handle 
-		//                     this can be used to identify the device the data is coming
-		//                     from or simply ignored.
-		//   unsigned int virtual_key - Standard 3d mouse key code 
+		/*!
+		 * \brief onSpaceMouseKeyDown processes the 3d mouse key presses
+		 * 
+		 * \param device      Pointer to the device that triggered the callback
+		 * \param virtual_key 3d mouse key code 
+		 */
 		virtual void onSpaceMouseKeyDown(const SpaceNavigator* device, unsigned int virtual_key) = 0;
 
-		//////////////////////////////////////////////////////////////////////////////////
-		// onSpaceMouseKeyUp processes the standard 3d mouse key releases
-		// This method can be overwritten
-		// Input:
-		//    DeviceId device - the raw input device handle 
-		//                     this can be used to identify the device the data is coming
-		//                     from or simply ignored.
-		//   unsigned int virtual_key - Standard 3d mouse key code 
+		/*!
+		 * \brief onSpaceMouseKeyUp processes the 3d mouse key releases
+		 * 
+		 * \param device      Pointer to the device that triggered the callback
+		 * \param virtual_key 3d mouse key code 
+		 */
 		virtual void onSpaceMouseKeyUp(const SpaceNavigator* device, unsigned int virtual_key) = 0;
 	};
 }}

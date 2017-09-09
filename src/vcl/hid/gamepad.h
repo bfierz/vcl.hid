@@ -94,12 +94,4 @@ namespace Vcl { namespace HID
 		/// Hat state
 		GamepadHat _hat{ GamepadHat::None };
 	};
-
-	class XBox360Controller : public Gamepad
-	{
-	public:
-		XBox360Controller() = default;
-
-
-	};
 }}

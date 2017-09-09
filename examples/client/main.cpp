@@ -77,13 +77,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					auto joystick = dynamic_cast<const Joystick*>(dev);
 					for (size_t i = 0; i < joystick->nrAxes(); i++)
 					{
-						auto state = joystick->axisState(i);
+						auto state = joystick->axisState(static_cast<uint32_t>(i));
 						output << state << L" ";
 					}
 
 					for (size_t i = 0; i < joystick->nrButtons(); i++)
 					{
-						auto pressed = joystick->buttonState(i);
+						auto pressed = joystick->buttonState(static_cast<uint32_t>(i));
 						if (pressed)
 						{
 							output << L"1 ";
@@ -104,7 +104,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					auto gamepad = dynamic_cast<const Gamepad*>(dev);
 					for (size_t i = 0; i < gamepad->nrAxes(); i++)
 					{
-						auto state = gamepad->axisState(i);
+						auto state = gamepad->axisState(static_cast<uint32_t>(i));
 						output << state << L" ";
 					}
 
@@ -112,7 +112,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 					for (size_t i = 0; i < gamepad->nrButtons(); i++)
 					{
-						auto pressed = gamepad->buttonState(i);
+						auto pressed = gamepad->buttonState(static_cast<uint32_t>(i));
 						if (pressed)
 						{
 							output << L"1 ";
@@ -133,13 +133,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					auto gamepad = dynamic_cast<const MultiAxisController*>(dev);
 					for (size_t i = 0; i < gamepad->nrAxes(); i++)
 					{
-						auto state = gamepad->axisState(i);
+						auto state = gamepad->axisState(static_cast<uint32_t>(i));
 						output << state << L" ";
 					}
 
 					for (size_t i = 0; i < gamepad->nrButtons(); i++)
 					{
-						auto pressed = gamepad->buttonState(i);
+						auto pressed = gamepad->buttonState(static_cast<uint32_t>(i));
 						if (pressed)
 						{
 							output << L"1 ";
@@ -157,7 +157,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 				DWORD written = 0;
 				WriteConsoleW(std_out,
-					output.str().c_str(), output.str().size(),
+					output.str().c_str(), static_cast<DWORD>(output.str().size()),
 					&written, nullptr);
 			}
 			
@@ -180,7 +180,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
-int main(char** argv, int argc)
+int main(char**, int)
 {
 	using namespace Vcl::HID::Windows;
 
@@ -209,7 +209,7 @@ int main(char** argv, int argc)
 
 	wchar_t* title= L"HID";
 	DWORD written = 0;
-	WriteConsoleW(std_out, title, wcslen(title), &written, nullptr);
+	WriteConsoleW(std_out, title, static_cast<DWORD>(wcslen(title)), &written, nullptr);
 
 
 	MSG msg = { 0 };

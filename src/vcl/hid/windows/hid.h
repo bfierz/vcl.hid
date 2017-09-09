@@ -106,17 +106,18 @@ namespace Vcl { namespace HID { namespace Windows
 		std::wstring name;
 	};
 	
+	//! Normalize the axix value using the device configuration data
 	inline float normalizeAxis(ULONG value, const Axis& axis)
 	{
-		if (value < axis.logicalCalibratedCenter)
+		if (static_cast<LONG>(value) < axis.logicalCalibratedCenter)
 		{
-			float range = axis.logicalCalibratedCenter - axis.logicalCalibratedMinimum;
-			return ((LONG)value - axis.logicalCalibratedCenter) / range;
+			float range = static_cast<float>(axis.logicalCalibratedCenter - axis.logicalCalibratedMinimum);
+			return (static_cast<LONG>(value) - axis.logicalCalibratedCenter) / range;
 		}
 		else
 		{
-			float range = axis.logicalCalibratedMaximum - axis.logicalCalibratedCenter;
-			return ((LONG)value - axis.logicalCalibratedCenter) / range;
+			float range = static_cast<float>(axis.logicalCalibratedMaximum - axis.logicalCalibratedCenter);
+			return (static_cast<LONG>(value) - axis.logicalCalibratedCenter) / range;
 		}
 	}
 
@@ -124,7 +125,9 @@ namespace Vcl { namespace HID { namespace Windows
 	{
 	public:
 		GenericHID(HANDLE raw_handle);
-
+		
+		//! Access the raw-input API handle
+		//! \returns The input device handle
 		HANDLE rawHandle() const { return _rawInputHandle; }
 
 		//! Access the windows internal handle
@@ -149,27 +152,25 @@ namespace Vcl { namespace HID { namespace Windows
 		const std::vector<HIDP_VALUE_CAPS>& axisCaps() const { return _axesCaps; }
 		const std::vector<HIDP_BUTTON_CAPS>& buttonCaps() const { return _buttonCaps; }
 
-	private:
-		
+	private:		
 		//! Read the device capabilities
 		auto readDeviceCaps() const -> std::tuple<std::vector<HIDP_BUTTON_CAPS>, std::vector<HIDP_VALUE_CAPS>>;
 
 		//! Map buttons and fetch calibration data
-		//! @param button_caps
-		//! @param mapping Direct Input related remapping of buttons
-		void calibrateButtons(std::vector<HIDP_BUTTON_CAPS>& button_caps, gsl::span<struct DirectInputButtonMapping> mapping);
+		//! \param mapping Direct Input related remapping of buttons
+		void readButtonCalibration(gsl::span<struct DirectInputButtonMapping> mapping) const;
 
 		//! Map axes and fetch calibration data
-		//! @param axes_caps
-		void calibrateAxes(std::vector<HIDP_VALUE_CAPS>& axes_caps, gsl::span<struct DirectInputAxisMapping> mapping);
+		//! \param axes_caps
+		void readAxisCalibration(const std::vector<HIDP_VALUE_CAPS>& axes_caps, gsl::span<struct DirectInputAxisMapping> mapping) const;
 
 		//! Convert and store the button caps
-		//! @param button_caps
-		//! @param mapping Direct Input related remapping of buttons
+		//! \param button_caps
+		//! \param mapping Direct Input related remapping of buttons
 		void storeButtons(std::vector<HIDP_BUTTON_CAPS>&& button_caps, gsl::span<struct DirectInputButtonMapping> mapping);
 
 		//! Convert and store the axes caps
-		//! @param axes_caps
+		//! \param axes_caps
 		void storeAxes(std::vector<HIDP_VALUE_CAPS>&& axes_caps, gsl::span<struct DirectInputAxisMapping> mapping);
 
 	private:

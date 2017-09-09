@@ -40,6 +40,7 @@
 
 namespace Vcl { namespace HID { namespace Windows
 {
+	//! Implementation of a 3Dconnexion space mouse
 	class SpaceNavigatorHID : public AbstractHID, public SpaceNavigator
 	{
 	private:
@@ -77,54 +78,44 @@ namespace Vcl { namespace HID { namespace Windows
 		
 	private:
 		
-		/*
-		 *	on3DMouseInput() does all the preprocessing of the rawinput device data before
-		 *	finally calling the move3D method.
+		/*!
+		 * \brief Does all the preprocessing of the rawinput device data before
+		 *        finally calling the move3D method.
 		 *
-		 *	If polling is enabled (Poll3DMouse==true) on3DMouseInput() is called from 
-		 *	the windows timer message handler (onTimer())
-		 *
-		 *	If polling is NOT enabled (Poll3DMouse==false) on3DMouseInput() is called 
-		 *	directly from the WM_INPUT handler (onRawInput())
+		 * If polling is enabled (_poll3DMouse == true) this method is called
+		 * from the windows timer message handler
+		 * If polling is not enabled (_poll3DMouse == false) this method is
+		 * called directly from the WM_INPUT handler
 		 */
 		void on3DMouseInput();
 		
-		//////////////////////////////////////////////////////////////////////////////////
-		// onSpaceMouseMove is invoked when new 3d mouse data is available.
-		// Override this method to process 3d mouse 6dof data in the application
-		// Input:
-		//    HANDLE hDevice - the raw input device handle 
-		//                     this can be used to identify the device the data is coming
-		//                     from or simply ignored.
-		//
-		//    ARRAY_NS::array<float, 6> aMotionData - contains the displacement data, using
-		//                     a right-handed coordinate system with z down
-		//                     see 'Programing for the 3dmouse' document available at
-		//                     www.3dconnexion.com.
-		//                     aMotionData[0], aMotionData[1], aMotionData[2] is the
-		//                     incremental pan zoom displacement vector (x,y,z).
-		//                     aMotionData[3], aMotionData[4], aMotionData[5] is the
-		//                     incremental rotation vector (NOT Euler angles)
+		/*!
+		 * \brief onSpaceMouseMove is invoked when new 3d mouse data is
+		 *        available.
+		 * 
+		 * \param motion_data Contains the displacement data, using a
+		 *                    right-handed coordinate system with z down.
+		 *                    See 'Programing for the 3dmouse' document
+		 *                    available at www.3dconnexion.com.
+		 *                    Entries 0, 1, 2 is the incremental pan zoom
+		 *                    displacement vector (x,y,z).
+		 *                    Entries 3, 4, 5 is the incremental rotation vector
+		 *                    (NOT Euler angles).
+		 */
 		void onSpaceMouseMove(std::array<float, 6> motion_data);
-
-		//////////////////////////////////////////////////////////////////////////////////
-		// onSpaceMouseKeyDown processes the standard 3d mouse key presses
-		// This method can be overwritten
-		// Input:
-		//    HANDLE hDevice - the raw input device handle 
-		//                     this can be used to identify the device the data is coming
-		//                     from or simply ignored.
-		//   UINT nVirtualKey - Standard 3d mouse key code 
+		
+		/*!
+		 * \brief onSpaceMouseKeyDown processes the 3d mouse key presses
+		 * 
+		 * \param virtual_key 3d mouse key code 
+		 */
 		void onSpaceMouseKeyDown(UINT virtual_key);
-
-		//////////////////////////////////////////////////////////////////////////////////
-		// onSpaceMouseKeyUp processes the standard 3d mouse key releases
-		// This method can be overwritten
-		// Input:
-		//    HANDLE hDevice - the raw input device handle 
-		//                     this can be used to identify the device the data is coming
-		//                     from or simply ignored.
-		//   UINT nVirtualKey - Standard 3d mouse key code 
+		
+		/*!
+		 * \brief onSpaceMouseKeyUp processes the 3d mouse key releases
+		 * 
+		 * \param virtual_key 3d mouse key code 
+		 */
 		void onSpaceMouseKeyUp(UINT virtual_key);
 
 	private:

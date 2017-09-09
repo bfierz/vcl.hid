@@ -50,9 +50,9 @@ namespace Vcl { namespace HID { namespace Windows
 		const auto names = device()->readDeviceName();
 		setVendorName(names.first);
 		setDeviceName(names.second);
-
-		setNrAxes(device()->axes().size());
-		setNrButtons(device()->buttons().size());
+		
+		setNrAxes(static_cast<uint32_t>(device()->axes().size()));
+		setNrButtons(static_cast<uint32_t>(device()->buttons().size()));
 
 		// Initialize axis data
 		_deviceData.axes.fill(0.0f);
@@ -66,7 +66,7 @@ namespace Vcl { namespace HID { namespace Windows
 		setAxisState(5, _deviceData.axes[5]);
 	}
 	
-	void SpaceNavigatorHID::onActivateApp(BOOL active, DWORD dwThreadID)
+	void SpaceNavigatorHID::onActivateApp(BOOL active, DWORD)
 	{
 		if (!_poll3DMouse)
 		{
@@ -75,6 +75,17 @@ namespace Vcl { namespace HID { namespace Windows
 				_last3DMouseInputTime = 0;
 			}
 		}
+		
+		// Initialize axis data
+		_deviceData.axes.fill(0.0f);
+				
+		setAxisState(0, _deviceData.axes[0]);
+		setAxisState(1, _deviceData.axes[1]);
+		setAxisState(2, _deviceData.axes[2]);
+				
+		setAxisState(4, _deviceData.axes[3]);
+		setAxisState(3, _deviceData.axes[4]);
+		setAxisState(5, _deviceData.axes[5]);
 	}
 
 	bool SpaceNavigatorHID::processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input)
@@ -266,11 +277,11 @@ namespace Vcl { namespace HID { namespace Windows
 			{
 				unsigned long dwChange = dwKeystate ^ dwOldKeystate;
 
-				for (int key = 1; key < 33; key++)
+				for (unsigned short key = 1; key < 33; key++)
 				{
 					if (dwChange & 0x01)
 					{
-						int virtual_key_code = HidToVirtualKey(device()->productId(), key);
+						unsigned int virtual_key_code = HidToVirtualKey(device()->productId(), key);
 						if (virtual_key_code)
 						{
 							if (dwKeystate & 0x01)

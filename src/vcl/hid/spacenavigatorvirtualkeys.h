@@ -26,8 +26,11 @@
 
 #define VCL_DEVICE_SPACENAVIGATOR_TRACE_VIRTUAL_KEYS 0
 
+VCL_BEGIN_EXTERNAL_HEADERS
 namespace Vcl { namespace HID
 {
+	// The data structures in this file are taken from the 3Dconnexion SDK
+
    enum e3dconnexion_pid : unsigned long
    {
       eSpacePilot = 0xc625,
@@ -63,7 +66,7 @@ namespace Vcl { namespace HID
       , "V3DK_ROTATE", "V3DK_PANZOOM", "V3DK_DOMINANT"
       , "V3DK_PLUS", "V3DK_MINUS"
    };
-#endif /* VCL_DEVICE_SPACENAVIGATOR */
+#endif // VCL_DEVICE_SPACENAVIGATOR_TRACE_VIRTUAL_KEYS
 
    struct tag_VirtualKeys
    {
@@ -105,21 +108,21 @@ namespace Vcl { namespace HID
    };
 
    /*-----------------------------------------------------------------------------
-   *
-   * unsigned short HidToVirtualKey(unsigned short pid, unsigned short hidKeyCode)
-   *
-   * Args:
-   *    pid - USB Product ID (PID) of 3D mouse device 
-   *    hidKeyCode - Hid keycode as retrieved from a Raw Input packet
-   *
-   * Return Value:
-   *    Returns the standard 3d mouse virtual key (button identifier) or zero if an error occurs.
-   *
-   * Description:
-   *    Converts a hid device keycode (button identifier) of a pre-2009 3Dconnexion USB device
-   *    to the standard 3d mouse virtual key definition.
-   *
-   *---------------------------------------------------------------------------*/
+    *
+    * unsigned short HidToVirtualKey(unsigned short pid, unsigned short hidKeyCode)
+    *
+    * Args:
+    *    pid - USB Product ID (PID) of 3D mouse device 
+    *    hidKeyCode - Hid keycode as retrieved from a Raw Input packet
+    *
+    * Return Value:
+    *    Returns the standard 3d mouse virtual key (button identifier) or zero if an error occurs.
+    *
+    * Description:
+    *    Converts a hid device keycode (button identifier) of a pre-2009 3Dconnexion USB device
+    *    to the standard 3d mouse virtual key definition.
+    *
+    *---------------------------------------------------------------------------*/
    inline unsigned short HidToVirtualKey(unsigned long pid, unsigned short hidKeyCode)
    {
       unsigned short virtualkey=hidKeyCode;
@@ -134,10 +137,11 @@ namespace Vcl { namespace HID
             break;
          }
       }
-      // Remaining devices are unchanged
+
 #if VCL_DEVICE_SPACENAVIGATOR_TRACE_VIRTUAL_KEYS
       TRACE("Converted %d to %s for pid 0x%x\n", hidKeyCode, _3dmouse_virtual_key[virtualkey], pid);
-#endif /* VCL_DEVICE_SPACENAVIGATOR */
+#endif // VCL_DEVICE_SPACENAVIGATOR_TRACE_VIRTUAL_KEYS
       return virtualkey;
    }
 }}
+VCL_END_EXTERNAL_HEADERS

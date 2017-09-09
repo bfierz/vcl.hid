@@ -36,7 +36,7 @@
 #include <vcl/hid/joystick.h>
 #include <vcl/hid/multiaxiscontroller.h>
 
-int main(char** argv, int argc)
+int main(char**, int)
 {
 	using namespace Vcl::HID::Windows;
 	using Vcl::HID::DeviceType;

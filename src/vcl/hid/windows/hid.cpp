@@ -24,13 +24,6 @@
  */
 #include "hid.h"
 
-// C++ standard library
-#include <iostream>
-
-// Windows
-#include <dinput.h>
-#include <dinputd.h>
-
 // VCL
 #include <vcl/core/contract.h>
 #include <vcl/math/ceil.h>
@@ -47,7 +40,7 @@ namespace
 {
 	//! Workaround for incorrect alignment of the RAWINPUT structure on x64 os
 	//! when running as Wow64.
-	UINT getRawInputBuffer(HWND hWnd, PRAWINPUT pData, PUINT pcbSize, UINT cbSizeHeader)
+	UINT getRawInputBuffer(HWND, PRAWINPUT pData, PUINT pcbSize, UINT cbSizeHeader)
 	{
 #ifdef VCL_ABI_WIN64
 		return ::GetRawInputBuffer(pData, pcbSize, cbSizeHeader);
@@ -95,7 +88,23 @@ namespace
 
 namespace Vcl { namespace HID { namespace Windows
 {
-	// Direct-input button mapping
+	//! Direct-input calibration structure
+	struct DirectInputObjectCalibration
+	{
+		LONG min;
+		LONG center;
+		LONG max;
+	};
+	
+	//! Direct-input object attributes
+	struct DirectInputObjectAttributes
+	{
+		DWORD   dwFlags;
+		WORD    wUsagePage;
+		WORD    wUsage;
+	};
+
+	//! Direct-input button mapping
 	struct DirectInputButtonMapping
 	{
 		WORD    usagePage;
@@ -103,14 +112,14 @@ namespace Vcl { namespace HID { namespace Windows
 		wchar_t name[32];
 	};
 
-	// Direct-input axis mapping and calibration
+	//! Direct-input axis mapping and calibration
 	struct DirectInputAxisMapping
 	{
-		WORD                 usagePage;
-		WORD                 usage;
-		bool                 isCalibrated;
-		DIOBJECTCALIBRATION  calibration;
-		wchar_t              name[32];
+		WORD usagePage;
+		WORD usage;
+		bool isCalibrated;
+		DirectInputObjectCalibration calibration;
+		wchar_t name[32];
 	};
 
 	GenericHID::GenericHID(HANDLE raw_handle)
@@ -157,8 +166,8 @@ namespace Vcl { namespace HID { namespace Windows
 		DirectInputButtonMapping di_button_mapping[128] = {};
 		DirectInputAxisMapping di_axis_mapping[7] = {};
 
-		calibrateButtons(std::get<0>(caps), di_button_mapping);
-		calibrateAxes(   std::get<1>(caps), di_axis_mapping);
+		readButtonCalibration(di_button_mapping);
+		readAxisCalibration(std::get<1>(caps), di_axis_mapping);
 
 		storeButtons(std::move(std::get<0>(caps)), di_button_mapping);
 		storeAxes(   std::move(std::get<1>(caps)), di_axis_mapping);
@@ -271,7 +280,7 @@ namespace Vcl { namespace HID { namespace Windows
 		return std::make_tuple(std::move(button_classes), std::move(axis_classes));
 	}
 
-	void GenericHID::calibrateAxes(std::vector<HIDP_VALUE_CAPS>& axes_caps, gsl::span<struct DirectInputAxisMapping> di_axis_mapping)
+	void GenericHID::readAxisCalibration(const std::vector<HIDP_VALUE_CAPS>& axes_caps, gsl::span<struct DirectInputAxisMapping> di_axis_mapping) const
 	{
 		for (const auto& axis : axes_caps)
 		{
@@ -334,9 +343,9 @@ namespace Vcl { namespace HID { namespace Windows
 					}
 				}
 
-				DIOBJECTATTRIBUTES mapping;
-				DWORD              valueType = REG_NONE;
-				DWORD              valueSize = 0;
+				DirectInputObjectAttributes mapping;
+				DWORD valueType = REG_NONE;
+				DWORD valueSize = 0;
 				RegQueryValueExW(key, L"Attributes", nullptr, &valueType, nullptr, &valueSize);
 				if (REG_BINARY == valueType && sizeof(mapping) == valueSize)
 				{
@@ -387,7 +396,7 @@ namespace Vcl { namespace HID { namespace Windows
 		}
 	}
 
-	void GenericHID::calibrateButtons(std::vector<HIDP_BUTTON_CAPS>& button_caps, gsl::span<struct DirectInputButtonMapping> di_button_mapping)
+	void GenericHID::readButtonCalibration(gsl::span<struct DirectInputButtonMapping> di_button_mapping) const
 	{
 		HIDD_ATTRIBUTES vendor_and_product_id;
 		if (FALSE != HidD_GetAttributes(fileHandle(), &vendor_and_product_id))
@@ -435,9 +444,9 @@ namespace Vcl { namespace HID { namespace Windows
 					}
 				}
 
-				DIOBJECTATTRIBUTES mapping;
-				DWORD              valueType = REG_NONE;
-				DWORD              valueSize = 0;
+				DirectInputObjectAttributes mapping;
+				DWORD valueType = REG_NONE;
+				DWORD valueSize = 0;
 				RegQueryValueExW(key, L"Attributes", nullptr, &valueType, nullptr, &valueSize);
 				if (REG_BINARY == valueType && sizeof(mapping) == valueSize) {
 
@@ -511,9 +520,9 @@ namespace Vcl { namespace HID { namespace Windows
 						di_name = mapping.name;
 						is_calibrated = mapping.isCalibrated;
 						if (mapping.isCalibrated) {
-							calibrated_minimum = mapping.calibration.lMin;
-							calibrated_center = mapping.calibration.lCenter;
-							calibrated_maximum = mapping.calibration.lMax;
+							calibrated_minimum = mapping.calibration.min;
+							calibrated_center = mapping.calibration.center;
+							calibrated_maximum = mapping.calibration.max;
 						}
 				
 						// Skip this mapping in following runs
@@ -556,18 +565,16 @@ namespace Vcl { namespace HID { namespace Windows
 		setVendorName(names.first);
 		setDeviceName(names.second);
 
-		setNrAxes(device()->axes().size());
-		setNrButtons(device()->buttons().size());
+		setNrAxes(static_cast<uint32_t>(device()->axes().size()));
+		setNrButtons(static_cast<uint32_t>(device()->buttons().size()));
 	}
 
 	template<typename JoystickType>
-	bool JoystickHID<JoystickType>::processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input)
+	bool JoystickHID<JoystickType>::processInput(HWND, UINT, PRAWINPUT raw_input)
 	{
 		PHIDP_PREPARSED_DATA preparsed_data;
 		if (HidD_GetPreparsedData(device()->fileHandle(), &preparsed_data) == FALSE)
-		{
-			return{};
-		}
+			return false;
 
 		// Free the allocated data structure at the end of the method
 		VCL_SCOPE_EXIT{ HidD_FreePreparsedData(preparsed_data); };
@@ -600,9 +607,11 @@ namespace Vcl { namespace HID { namespace Windows
 				case HID_USAGE_GENERIC_RX:
 					setAxisState(static_cast<uint32_t>(JoystickAxis::RX), normalizeAxis(value, axis));
 					break;
+
 				case HID_USAGE_GENERIC_RY:
 					setAxisState(static_cast<uint32_t>(JoystickAxis::RY), normalizeAxis(value, axis));
 					break;
+
 				case HID_USAGE_GENERIC_RZ:
 					setAxisState(static_cast<uint32_t>(JoystickAxis::RZ), normalizeAxis(value, axis));
 					break;
@@ -644,13 +653,13 @@ namespace Vcl { namespace HID { namespace Windows
 		const auto names = device()->readDeviceName();
 		setVendorName(names.first);
 		setDeviceName(names.second);
-
-		setNrAxes(device()->axes().size());
-		setNrButtons(device()->buttons().size());
+		
+		setNrAxes(static_cast<uint32_t>(device()->axes().size()));
+		setNrButtons(static_cast<uint32_t>(device()->buttons().size()));
 	}
 
 	template<typename GamepadType>
-	bool GamepadHID<GamepadType>::processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input)
+	bool GamepadHID<GamepadType>::processInput(HWND, UINT, PRAWINPUT raw_input)
 	{
 		// We are not interested in keyboard or mouse data received via raw input
 		if (raw_input->header.dwType != RIM_TYPEHID)
@@ -739,13 +748,13 @@ namespace Vcl { namespace HID { namespace Windows
 		const auto names = device()->readDeviceName();
 		setVendorName(names.first);
 		setDeviceName(names.second);
-
-		setNrAxes(device()->axes().size());
-		setNrButtons(device()->buttons().size());
+		
+		setNrAxes(static_cast<uint32_t>(device()->axes().size()));
+		setNrButtons(static_cast<uint32_t>(device()->buttons().size()));
 	}
 	
 	template<typename ControllerType>
-	bool MultiAxisControllerHID<ControllerType>::processInput(HWND window_handle, UINT input_code, PRAWINPUT raw_input)
+	bool MultiAxisControllerHID<ControllerType>::processInput(HWND, UINT, PRAWINPUT raw_input)
 	{
 		// We are not interested in keyboard or mouse data received via raw input
 		if (raw_input->header.dwType != RIM_TYPEHID)
@@ -909,7 +918,10 @@ namespace Vcl { namespace HID { namespace Windows
 			}
 		}
 
-		if (RegisterRawInputDevices(input_requests.data(), input_requests.size(), sizeof(RAWINPUTDEVICE)) == FALSE)
+		if (RegisterRawInputDevices(
+			input_requests.data(),
+			static_cast<UINT>(input_requests.size()),
+			sizeof(RAWINPUTDEVICE)) == FALSE)
 		{
 		}
 	}
