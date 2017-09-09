@@ -1,5 +1,5 @@
 /*  
- * The VCL Jobs is released under the MIT
+ * This file is part of the Visual Computing Library (VCL) release under the
  * license.
  * 
  * Copyright (c) 2017 Basil Fierz
