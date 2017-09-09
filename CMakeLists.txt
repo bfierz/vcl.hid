@@ -47,29 +47,29 @@ ENDIF (VCL_HID_STANDALONE_PROJECT)
 ADD_LIBRARY(vcl.hid STATIC "")
 
 SET(VCL_HID_WINDOWS_INC
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/windows/hid.h
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/windows/spacenavigator.h
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/windows/hid.h
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/windows/spacenavigator.h
 )
 SET(VCL_HID_WINDOWS_SRC
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/windows/hid.cpp
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/windows/spacenavigator.cpp
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/windows/hid.cpp
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/windows/spacenavigator.cpp
 )
 
 SET(VCL_HID_INC
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/device.h
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/gamepad.h
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/joystick.h
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/multiaxiscontroller.h
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/spacenavigator.h
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/spacenavigatorhandler.h
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/spacenavigatorvirtualkeys.h
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/device.h
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/gamepad.h
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/joystick.h
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/multiaxiscontroller.h
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/spacenavigator.h
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/spacenavigatorhandler.h
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/spacenavigatorvirtualkeys.h
 )
 SET(VCL_HID_SRC
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/device.cpp
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/gamepad.cpp
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/joystick.cpp
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/multiaxiscontroller.cpp
-	${CMAKE_SOURCE_DIR}/src/vcl/hid/spacenavigator.cpp
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/device.cpp
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/gamepad.cpp
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/joystick.cpp
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/multiaxiscontroller.cpp
+	${PROJECT_SOURCE_DIR}/src/vcl/hid/spacenavigator.cpp
 )
 
 SOURCE_GROUP("windows" FILES ${VCL_HID_WINDOWS_SRC} ${VCL_HID_WINDOWS_INC})
