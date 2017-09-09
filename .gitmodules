@@ -1,3 +1,0 @@
-[submodule "externals/vcl"]
-	path = externals/vcl
-	url = https://github.com/bfierz/vcl
