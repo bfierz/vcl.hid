@@ -73,6 +73,9 @@ namespace Vcl { namespace HID
 		std::vector<SpaceNavigatorHandler*> _handlers;
 
 	protected: // Configuration
+		//! Only process values when application is in foreground
+		bool _only_foreground{ false };
+
 		//! Speed of the mouse motion
 		Speed _speed{ Speed::Mid };
 

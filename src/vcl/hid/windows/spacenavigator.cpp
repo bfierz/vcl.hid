@@ -53,6 +53,17 @@ namespace Vcl { namespace HID { namespace Windows
 
 		setNrAxes(device()->axes().size());
 		setNrButtons(device()->buttons().size());
+
+		// Initialize axis data
+		_deviceData.axes.fill(0.0f);
+				
+		setAxisState(0, _deviceData.axes[0]);
+		setAxisState(1, _deviceData.axes[1]);
+		setAxisState(2, _deviceData.axes[2]);
+				
+		setAxisState(4, _deviceData.axes[3]);
+		setAxisState(3, _deviceData.axes[4]);
+		setAxisState(5, _deviceData.axes[5]);
 	}
 	
 	void SpaceNavigatorHID::onActivateApp(BOOL active, DWORD dwThreadID)
@@ -93,12 +104,12 @@ namespace Vcl { namespace HID { namespace Windows
 			}
 		}
 
-		return false;
+		return true;
 	}
 	
 	bool SpaceNavigatorHID::translateRawInputData(UINT input_code, PRAWINPUT raw_input)
 	{
-		bool is_foreground = (input_code == RIM_INPUT);
+		bool is_foreground = (input_code == RIM_INPUT) || !_only_foreground;
 
 #if VCL_DEVICE_SPACENAVIGATOR_TRACE_RI_TYPE
 		wprintf(L"Rawinput.header.dwType=0x%x\n", pRawInput->header.dwType);
@@ -154,12 +165,16 @@ namespace Vcl { namespace HID { namespace Windows
 			{
 				short* pnRawData = reinterpret_cast<short*>(&raw_input->data.hid.bRawData[1]);
 				// Cache the pan zoom data
-				_deviceData.axes[0] = static_cast<float>(pnRawData[0]);
-				_deviceData.axes[1] = static_cast<float>(pnRawData[1]);
-				_deviceData.axes[2] = static_cast<float>(pnRawData[2]);
-
+				_deviceData.axes[0] = normalizeAxis(pnRawData[0], device()->axes()[0]);
+				_deviceData.axes[1] = normalizeAxis(pnRawData[1], device()->axes()[1]);
+				_deviceData.axes[2] = normalizeAxis(pnRawData[2], device()->axes()[2]);
+					
+				setAxisState(0, _deviceData.axes[0]);
+				setAxisState(1, _deviceData.axes[1]);
+				setAxisState(2, _deviceData.axes[2]);
+				
 #if VCL_DEVICE_SPACENAVIGATOR_TRACE_RI_RAWDATA
-				wprintf(L"Pan/Zoom RI Data =\t0x%x,\t0x%x,\t0x%x\n",
+				wprintf(L"Pan/Zoom RI Data =\t%d,\t%d,\t%d\n",
 						pnRawData[0],
 						pnRawData[1],
 						pnRawData[2]);
@@ -167,17 +182,20 @@ namespace Vcl { namespace HID { namespace Windows
 				if (raw_input->data.hid.dwSizeHid >= 13) // Highspeed package
 				{
 					// Cache the rotation data
-					_deviceData.axes[3] = static_cast<float>(pnRawData[3]);
-					_deviceData.axes[4] = static_cast<float>(pnRawData[4]);
-					_deviceData.axes[5] = static_cast<float>(pnRawData[5]);
+					_deviceData.axes[3] = normalizeAxis(pnRawData[3], device()->axes()[3]);
+					_deviceData.axes[4] = normalizeAxis(pnRawData[4], device()->axes()[4]);
+					_deviceData.axes[5] = normalizeAxis(pnRawData[5], device()->axes()[5]);
 					_deviceData.isDirty = true;
 #if VCL_DEVICE_SPACENAVIGATOR_TRACE_RI_RAWDATA
-					wprintf(L"Rotation RI Data =\t0x%x,\t0x%x,\t0x%x\n",
+					wprintf(L"Rotation RI Data =\t%d,\t%d,\t%d\n",
 						pnRawData[3],
 						pnRawData[4],
 						pnRawData[5]);
 #endif // VCL_DEVICE_SPACENAVIGATOR_TRACE_RI_RAWDATA
-
+				
+					setAxisState(4, _deviceData.axes[3]);
+					setAxisState(3, _deviceData.axes[4]);
+					setAxisState(5, _deviceData.axes[5]);
 					return true;
 				}
 			}
@@ -185,6 +203,14 @@ namespace Vcl { namespace HID { namespace Windows
 			{
 				// Zero out the data if the app is not in forground
 				_deviceData.axes.fill(0.f);
+				
+				setAxisState(0, _deviceData.axes[0]);
+				setAxisState(1, _deviceData.axes[1]);
+				setAxisState(2, _deviceData.axes[2]);
+				
+				setAxisState(4, _deviceData.axes[3]);
+				setAxisState(3, _deviceData.axes[4]);
+				setAxisState(5, _deviceData.axes[5]);
 			}
 		}
 		else if (raw_input->data.hid.bRawData[0] == 0x02)  // Rotation vector
@@ -197,13 +223,17 @@ namespace Vcl { namespace HID { namespace Windows
 
 				short* pnRawData = reinterpret_cast<short*>(&raw_input->data.hid.bRawData[1]);
 				// Cache the rotation data
-				_deviceData.axes[3] = static_cast<float>(pnRawData[0]);
-				_deviceData.axes[4] = static_cast<float>(pnRawData[1]);
-				_deviceData.axes[5] = static_cast<float>(pnRawData[2]);
+				_deviceData.axes[3] = normalizeAxis(pnRawData[0], device()->axes()[3]);
+				_deviceData.axes[4] = normalizeAxis(pnRawData[1], device()->axes()[4]);
+				_deviceData.axes[5] = normalizeAxis(pnRawData[2], device()->axes()[5]);
 				_deviceData.isDirty = true;
+				
+				setAxisState(4, _deviceData.axes[3]);
+				setAxisState(3, _deviceData.axes[4]);
+				setAxisState(5, _deviceData.axes[5]);
 
 #if VCL_DEVICE_SPACENAVIGATOR_TRACE_RI_RAWDATA
-				wprintf(L"Rotation RI Data =\t0x%x,\t0x%x,\t0x%x\n",
+				wprintf(L"Rotation RI Data =\t%d,\t%d,\t%d\n",
 						pnRawData[0],
 						pnRawData[1],
 						pnRawData[2]);
@@ -220,6 +250,9 @@ namespace Vcl { namespace HID { namespace Windows
 #if VCL_DEVICE_SPACENAVIGATOR_TRACE_RI_RAWDATA
 			wprintf(L"ButtonData =0x%x\n", dwKeystate);
 #endif // VCL_DEVICE_SPACENAVIGATOR_TRACE_RI_RAWDATA
+
+			// Store the new keystate
+			setButtonStates(dwKeystate);
 
 			// Log the keystate changes
 			unsigned long dwOldKeystate = _keystate;
@@ -250,6 +283,8 @@ namespace Vcl { namespace HID { namespace Windows
 					dwKeystate >>=1;
 				}
 			}
+
+			// Don't signal further input processing as buttons were handled above
 		}
 		return false;
 	}
@@ -257,7 +292,7 @@ namespace Vcl { namespace HID { namespace Windows
 	void SpaceNavigatorHID::on3DMouseInput()
 	{
 		// Don't do any data processing in background
-		bool is_foreground = (::GetActiveWindow() != NULL);
+		bool is_foreground = (::GetActiveWindow() != NULL) || !_only_foreground;
 		if (!is_foreground)
 		{
 			// Set all cached data to zero so that a zero event is seen 

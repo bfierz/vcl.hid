@@ -105,6 +105,20 @@ namespace Vcl { namespace HID { namespace Windows
 		//! Name as given by the driver
 		std::wstring name;
 	};
+	
+	inline float normalizeAxis(ULONG value, const Axis& axis)
+	{
+		if (value < axis.logicalCalibratedCenter)
+		{
+			float range = axis.logicalCalibratedCenter - axis.logicalCalibratedMinimum;
+			return ((LONG)value - axis.logicalCalibratedCenter) / range;
+		}
+		else
+		{
+			float range = axis.logicalCalibratedMaximum - axis.logicalCalibratedCenter;
+			return ((LONG)value - axis.logicalCalibratedCenter) / range;
+		}
+	}
 
 	class GenericHID
 	{

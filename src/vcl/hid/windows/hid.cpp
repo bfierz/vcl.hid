@@ -33,6 +33,7 @@
 
 // VCL
 #include <vcl/core/contract.h>
+#include <vcl/math/ceil.h>
 #include <vcl/hid/windows/spacenavigator.h>
 #include <vcl/hid/gamepad.h>
 #include <vcl/hid/joystick.h>
@@ -500,9 +501,9 @@ namespace Vcl { namespace HID { namespace Windows
 				)
 			{
 				bool    is_calibrated = true;
-				int32_t calibrated_minimum = 0;
-				int32_t calibrated_maximum = 1 <<  axis_cap.BitSize;
-				int32_t calibrated_center  = 1 << (axis_cap.BitSize - 1);
+				int32_t calibrated_minimum = axis_cap.LogicalMin;
+				int32_t calibrated_maximum = axis_cap.LogicalMax;
+				int32_t calibrated_center  = (axis_cap.LogicalMin + axis_cap.LogicalMax) / 2;
 				wchar_t const * di_name = L"";
 				
 				for (auto & mapping : di_axis_mapping) {
@@ -542,23 +543,6 @@ namespace Vcl { namespace HID { namespace Windows
 		}
 
 		_axesCaps = std::move(axes_caps);
-	}
-
-	namespace
-	{
-		float normalizeAxis(ULONG value, const Axis& axis)
-		{
-			if (value < axis.logicalCalibratedCenter)
-			{
-				float range = axis.logicalCalibratedCenter - axis.logicalCalibratedMinimum;
-				return ((LONG)value - axis.logicalCalibratedCenter) / range;
-			}
-			else
-			{
-				float range = axis.logicalCalibratedMaximum - axis.logicalCalibratedCenter;
-				return ((LONG)value - axis.logicalCalibratedCenter) / range;
-			}
-		}
 	}
 
 	template<typename JoystickType>
@@ -862,9 +846,16 @@ namespace Vcl { namespace HID { namespace Windows
 		if (GetRawInputBuffer(nullptr, &input_buffer_size, sizeof(RAWINPUTHEADER)) != 0)
 			return false;
 
-		auto raw_input_buffer = std::make_unique<RAWINPUT[]>(input_buffer_size);
-		auto raw_input = raw_input_buffer.get();
+		// According to the MSDN documentation use '*pcbSize * 8'.
+		// Add an additional 8 bytes for alignment
+		input_buffer_size *= 9;
+
+		auto raw_input_buffer = std::make_unique<uint8_t[]>(input_buffer_size);
+		auto aligned_raw_input_buffer = Mathematics::ceil<8>(reinterpret_cast<uint64_t>(raw_input_buffer.get()));
+		auto raw_input = reinterpret_cast<PRAWINPUT>(aligned_raw_input_buffer);
 		UINT nr_buffers = GetRawInputBuffer(raw_input, &input_buffer_size, sizeof(RAWINPUTHEADER));
+		if (nr_buffers == UINT_MAX)
+			return false;
 
 		for (UINT i = 0; i < nr_buffers; i++)
 		{
@@ -874,11 +865,13 @@ namespace Vcl { namespace HID { namespace Windows
 				return device->device()->rawHandle() == raw_input->header.hDevice;
 			});
 
+			bool processed = false;
 			if (dev_it != _devices.end())
-				(*dev_it)->processInput(window_handle, input_code, raw_input);
+				processed = (*dev_it)->processInput(window_handle, input_code, raw_input);
 			
 			// Clean the buffer
-			::DefRawInputProc(&raw_input, 1, sizeof(RAWINPUTHEADER)); 
+			if (!processed)
+				::DefRawInputProc(&raw_input, 1, sizeof(RAWINPUTHEADER)); 
 
 			raw_input = NEXTRAWINPUTBLOCK(raw_input);
 		}
@@ -937,7 +930,7 @@ namespace Vcl { namespace HID { namespace Windows
 		HANDLE heap_handle = GetProcessHeap();
 		PRAWINPUT raw_input = (PRAWINPUT)HeapAlloc(heap_handle, 0, buffer_size);
 		if (!raw_input)
-			return 0;
+			return false;
 
 		// Read the input data
 		GetRawInputData(raw_input_handle, RID_INPUT, raw_input, &buffer_size, sizeof(RAWINPUTHEADER));
@@ -955,7 +948,8 @@ namespace Vcl { namespace HID { namespace Windows
 		}
 
 		// Clean the buffer
-		::DefRawInputProc(&raw_input, 1, sizeof(RAWINPUTHEADER));
+		if (!processed)
+			::DefRawInputProc(&raw_input, 1, sizeof(RAWINPUTHEADER));
 		HeapFree(heap_handle, 0, raw_input);
 
 		// Check if any other input messages are still in the pipeline

@@ -28,6 +28,7 @@
 #include <vcl/config/global.h>
 
 // C++ Standard library
+#include <iomanip>
 #include <iostream>
 
 // VCL
@@ -64,6 +65,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				output.str(std::wstring{});
 				output.clear();
+				output << std::fixed << std::showpos << std::setprecision(2);
 
 				SetConsoleCursorPosition(std_out, { 0, curr_line++ });
 				switch (dev->type())
