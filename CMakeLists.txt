@@ -2,62 +2,92 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.6)
 
 PROJECT(vcl.hid)
 
-# Configure the VCL compilation environment
-SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/externals/vcl/src/cmake")
-INCLUDE(externals/vcl/src/cmake/VCLConfig.cmake)
+# Determine whether this is a standalone project or included by other projects
+SET(VCL_HID_STANDALONE_PROJECT OFF)
+IF (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  SET(VCL_HID_STANDALONE_PROJECT ON)
+ENDIF ()
 
-# External libraries
-SET(EIGEN3_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/externals/vcl/src/externals/eigen")
+# Load the VCL core library from externally
+IF (VCL_HID_STANDALONE_PROJECT)
 
-SUBDIRS(externals/vcl/src/externals/gsl)
-SET(GSL_TEST OFF CACHE BOOL "" FORCE)
-SUBDIRS(externals/vcl/src/externals/fmtlib)
-SUBDIRS(externals/vcl/src/externals/json)
-SET(BuildTests OFF CACHE BOOL "" FORCE)
-SUBDIRS(externals/vcl/src/libs/vcl.core)
+	INCLUDE(ExternalProject)
+
+	SET(VCL_SOURCE_DIR "${CMAKE_BINARY_DIR}/externals/vcl-src")
+
+	EXTERNALPROJECT_ADD(vcl
+		GIT_REPOSITORY    https://github.com/bfierz/vcl
+		GIT_TAG           master
+		SOURCE_DIR        "${VCL_SOURCE_DIR}"
+		BINARY_DIR        "${CMAKE_BINARY_DIR}/externals/vcl-build"
+		CONFIGURE_COMMAND ""
+		BUILD_COMMAND     ""
+		INSTALL_COMMAND   ""
+		TEST_COMMAND      ""
+	)
+		
+	# Configure the VCL compilation environment
+	SET(CMAKE_MODULE_PATH "${VCL_SOURCE_DIR}/src/cmake")
+	INCLUDE(${VCL_SOURCE_DIR}/src/cmake/VCLConfig.cmake)
+	
+	# External libraries
+	SET(EIGEN3_INCLUDE_DIR "${VCL_SOURCE_DIR}/src/externals/eigen")
+
+	SUBDIRS(${VCL_SOURCE_DIR}/src/externals/gsl)
+	SET(GSL_TEST OFF CACHE BOOL "" FORCE)
+	SUBDIRS(${VCL_SOURCE_DIR}/src/externals/fmtlib)
+	SUBDIRS(${VCL_SOURCE_DIR}/src/externals/json)
+	SET(BuildTests OFF CACHE BOOL "" FORCE)
+
+	SUBDIRS(${VCL_SOURCE_DIR}/src/libs/vcl.core)
+
+ENDIF (VCL_HID_STANDALONE_PROJECT)
+
+# Generate library
+ADD_LIBRARY(vcl.hid STATIC "")
 
 SET(VCL_HID_WINDOWS_INC
-	src/vcl/hid/windows/hid.h
-	src/vcl/hid/windows/spacenavigator.h
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/windows/hid.h
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/windows/spacenavigator.h
 )
 SET(VCL_HID_WINDOWS_SRC
-	src/vcl/hid/windows/hid.cpp
-	src/vcl/hid/windows/spacenavigator.cpp
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/windows/hid.cpp
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/windows/spacenavigator.cpp
 )
 
 SET(VCL_HID_INC
-	src/vcl/hid/device.h
-	src/vcl/hid/gamepad.h
-	src/vcl/hid/joystick.h
-	src/vcl/hid/multiaxiscontroller.h
-	src/vcl/hid/spacenavigator.h
-	src/vcl/hid/spacenavigatorhandler.h
-	src/vcl/hid/spacenavigatorvirtualkeys.h
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/device.h
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/gamepad.h
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/joystick.h
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/multiaxiscontroller.h
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/spacenavigator.h
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/spacenavigatorhandler.h
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/spacenavigatorvirtualkeys.h
 )
 SET(VCL_HID_SRC
-	src/vcl/hid/device.cpp
-	src/vcl/hid/gamepad.cpp
-	src/vcl/hid/joystick.cpp
-	src/vcl/hid/multiaxiscontroller.cpp
-	src/vcl/hid/spacenavigator.cpp
-)
-
-SET(SOURCE
-	${VCL_HID_WINDOWS_INC}
-	${VCL_HID_WINDOWS_SRC}
-	${VCL_HID_INC}
-	${VCL_HID_SRC}
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/device.cpp
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/gamepad.cpp
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/joystick.cpp
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/multiaxiscontroller.cpp
+	${CMAKE_SOURCE_DIR}/src/vcl/hid/spacenavigator.cpp
 )
 
 SOURCE_GROUP("windows" FILES ${VCL_HID_WINDOWS_SRC} ${VCL_HID_WINDOWS_INC})
 SOURCE_GROUP("" FILES ${VCL_HID_SRC} ${VCL_HID_INC})
 
-# Generate library
-ADD_LIBRARY(vcl.hid STATIC ${SOURCE})
-SET_TARGET_PROPERTIES(vcl.hid PROPERTIES FOLDER libs)
-SET_TARGET_PROPERTIES(vcl.hid PROPERTIES DEBUG_POSTFIX _d)
+TARGET_SOURCES(vcl.hid
+	PRIVATE
+		${VCL_HID_WINDOWS_SRC}
+		${VCL_HID_SRC}
+	PUBLIC
+		${VCL_HID_WINDOWS_INC}
+		${VCL_HID_INC}
+)
 
 TARGET_INCLUDE_DIRECTORIES(vcl.hid PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+SET_TARGET_PROPERTIES(vcl.hid PROPERTIES FOLDER libs)
+SET_TARGET_PROPERTIES(vcl.hid PROPERTIES DEBUG_POSTFIX _d)
 
 TARGET_LINK_LIBRARIES(vcl.hid
 	vcl_core
@@ -65,7 +95,7 @@ TARGET_LINK_LIBRARIES(vcl.hid
 )
 
 # Build examples
-OPTION(VCL_HID_BUILD_EXAMPLES "Build the examples" OFF)
+OPTION(VCL_HID_BUILD_EXAMPLES "Build the examples" ${VCL_HID_STANDALONE_PROJECT})
 IF (VCL_HID_BUILD_EXAMPLES)
 
 	# Enumeration example
