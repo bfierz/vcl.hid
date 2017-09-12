@@ -14,17 +14,25 @@ IF (VCL_HID_STANDALONE_PROJECT)
 	INCLUDE(ExternalProject)
 
 	SET(VCL_SOURCE_DIR "${CMAKE_BINARY_DIR}/externals/vcl-src")
-
-	EXTERNALPROJECT_ADD(vcl
-		GIT_REPOSITORY    https://github.com/bfierz/vcl
-		GIT_TAG           master
-		SOURCE_DIR        "${VCL_SOURCE_DIR}"
-		BINARY_DIR        "${CMAKE_BINARY_DIR}/externals/vcl-build"
-		CONFIGURE_COMMAND ""
-		BUILD_COMMAND     ""
-		INSTALL_COMMAND   ""
-		TEST_COMMAND      ""
+	SET(VCL_BINARY_DIR "${CMAKE_BINARY_DIR}/externals/vcl-build")
+	
+	FILE(MAKE_DIRECTORY ${VCL_SOURCE_DIR})
+	EXECUTE_PROCESS(
+		COMMAND git clone https://github.com/bfierz/vcl.git .
+		COMMAND git submodule update --init
+		WORKING_DIRECTORY ${VCL_SOURCE_DIR}
 	)
+
+	#EXTERNALPROJECT_ADD(vcl
+	#	GIT_REPOSITORY    https://github.com/bfierz/vcl.git
+	#	GIT_TAG           master
+	#	SOURCE_DIR        "${VCL_SOURCE_DIR}"
+	#	BINARY_DIR        "${VCL_BINARY_DIR}"
+	#	CONFIGURE_COMMAND ""
+	#	BUILD_COMMAND     ""
+	#	INSTALL_COMMAND   ""
+	#	TEST_COMMAND      ""
+	#)
 		
 	# Configure the VCL compilation environment
 	SET(CMAKE_MODULE_PATH "${VCL_SOURCE_DIR}/src/cmake")

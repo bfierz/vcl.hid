@@ -62,15 +62,15 @@ namespace Vcl { namespace HID
 		static const float AngularVelocity;
 
 	public: // Handler management
-		void registerHandler(SpaceNavigatorHandler* handler);
-		void unregisterHandler(SpaceNavigatorHandler* handler);
+		static void registerHandler(SpaceNavigatorHandler* handler);
+		static void unregisterHandler(SpaceNavigatorHandler* handler);
 
 	public: // Configuration
 		//! Set the speed configuration
 		void setSpeed(Speed speed) { _speed = speed; }
 
 	protected: // Handlers
-		std::vector<SpaceNavigatorHandler*> _handlers;
+		static std::vector<SpaceNavigatorHandler*> _handlers;
 
 	protected: // Configuration
 		//! Only process values when application is in foreground
