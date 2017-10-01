@@ -30,7 +30,7 @@
 namespace Vcl { namespace HID
 {
 	const unsigned int SpaceNavigator::LogitechVendorID = 0x46d;
-	const float SpaceNavigator::AngularVelocity = 8.0e-6f;
+	const float SpaceNavigator::AngularVelocity = 8.0e-3f;
 	
 	std::vector<SpaceNavigatorHandler*> SpaceNavigator::_handlers;
 

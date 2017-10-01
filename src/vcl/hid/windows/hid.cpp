@@ -893,6 +893,10 @@ namespace Vcl { namespace HID { namespace Windows
 		std::vector<RAWINPUTDEVICE> input_requests;
 		input_requests.reserve(DeviceType::Count);
 
+		DWORD flags = 0;
+		if (window_handle)
+			flags |= RIDEV_INPUTSINK;
+
 		for (size_t i = 0; i < DeviceType::Count; i++)
 		{
 			if (device_types.isSet((DeviceType::Enum) (1 << i)))
@@ -900,19 +904,19 @@ namespace Vcl { namespace HID { namespace Windows
 				switch (1 << i)
 				{
 				case DeviceType::Mouse:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x02, RIDEV_INPUTSINK | RIDEV_NOLEGACY, window_handle });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x02, flags | RIDEV_NOLEGACY, window_handle });
 					break;
 				case DeviceType::Keyboard:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x06, RIDEV_INPUTSINK | RIDEV_NOLEGACY, window_handle });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x06, flags | RIDEV_NOLEGACY, window_handle });
 					break;
 				case DeviceType::Joystick:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x04, RIDEV_INPUTSINK, window_handle });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x04, flags, window_handle });
 					break;
 				case DeviceType::Gamepad:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x05, RIDEV_INPUTSINK, window_handle });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x05, flags, window_handle });
 					break;
 				case DeviceType::MultiAxisController:
-					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x08, RIDEV_INPUTSINK | RIDEV_DEVNOTIFY, window_handle });
+					input_requests.emplace_back(RAWINPUTDEVICE{ 0x01, 0x08, flags | RIDEV_DEVNOTIFY, window_handle });
 					break;
 				}
 			}
