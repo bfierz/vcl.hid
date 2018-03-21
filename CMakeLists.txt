@@ -1,69 +1,62 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.6)
+cmake_minimum_required(VERSION 3.6)
 
-PROJECT(vcl.hid)
+project(vcl.hid)
 
 # Determine whether this is a standalone project or included by other projects
-SET(VCL_HID_STANDALONE_PROJECT OFF)
-IF (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
-  SET(VCL_HID_STANDALONE_PROJECT ON)
-ENDIF ()
+set(VCL_HID_STANDALONE_PROJECT OFF)
+if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  set(VCL_HID_STANDALONE_PROJECT ON)
+endif()
 
-# Load the VCL core library from externally
-IF (VCL_HID_STANDALONE_PROJECT)
+# Load the VCL libraries from externally
+set(VCL_SOURCE_DIR "${CMAKE_BINARY_DIR}/externals/vcl-src")
+set(VCL_BINARY_DIR "${CMAKE_BINARY_DIR}/externals/vcl-build")
 
-	INCLUDE(ExternalProject)
+if (VCL_HID_STANDALONE_PROJECT)
+	message(STATUS "Update VCL in '${VCL_SOURCE_DIR}'")
+	if(NOT EXISTS "${VCL_SOURCE_DIR}")
+		file(MAKE_DIRECTORY ${VCL_SOURCE_DIR})
+		execute_process(
+			COMMAND git clone https://github.com/bfierz/vcl.git .
+			COMMAND git checkout master
+			COMMAND git submodule update --init --recursive
+			WORKING_DIRECTORY ${VCL_SOURCE_DIR}
+		)
+	else()
+		execute_process(
+			COMMAND git fetch --all --prune
+			COMMAND git checkout "master"
+			COMMAND git merge
+			COMMAND git submodule sync
+			COMMAND git submodule update --init --recursive
+			WORKING_DIRECTORY ${VCL_SOURCE_DIR}
+		)
+	endif()
+endif()
 
-	SET(VCL_SOURCE_DIR "${CMAKE_BINARY_DIR}/externals/vcl-src")
-	SET(VCL_BINARY_DIR "${CMAKE_BINARY_DIR}/externals/vcl-build")
-	
-	FILE(MAKE_DIRECTORY ${VCL_SOURCE_DIR})
-	EXECUTE_PROCESS(
-		COMMAND git clone https://github.com/bfierz/vcl.git .
-		COMMAND git submodule update --init
-		WORKING_DIRECTORY ${VCL_SOURCE_DIR}
-	)
-
-	#EXTERNALPROJECT_ADD(vcl
-	#	GIT_REPOSITORY    https://github.com/bfierz/vcl.git
-	#	GIT_TAG           master
-	#	SOURCE_DIR        "${VCL_SOURCE_DIR}"
-	#	BINARY_DIR        "${VCL_BINARY_DIR}"
-	#	CONFIGURE_COMMAND ""
-	#	BUILD_COMMAND     ""
-	#	INSTALL_COMMAND   ""
-	#	TEST_COMMAND      ""
-	#)
-		
-	# Configure the VCL compilation environment
-	SET(CMAKE_MODULE_PATH "${VCL_SOURCE_DIR}/src/cmake")
-	INCLUDE(${VCL_SOURCE_DIR}/src/cmake/VCLConfig.cmake)
-	
-	# External libraries
-	SET(EIGEN3_INCLUDE_DIR "${VCL_SOURCE_DIR}/src/externals/eigen")
-
-	SUBDIRS(${VCL_SOURCE_DIR}/src/externals/gsl)
-	SET(GSL_TEST OFF CACHE BOOL "" FORCE)
-	SUBDIRS(${VCL_SOURCE_DIR}/src/externals/fmtlib)
-	SUBDIRS(${VCL_SOURCE_DIR}/src/externals/json)
-	SET(BuildTests OFF CACHE BOOL "" FORCE)
-
-	SUBDIRS(${VCL_SOURCE_DIR}/src/libs/vcl.core)
-
-ENDIF (VCL_HID_STANDALONE_PROJECT)
+# VCL base libraries
+if (VCL_HID_STANDALONE_PROJECT)
+	option(VCL_BUILD_BENCHMARKS "" OFF)
+	option(VCL_BUILD_EXAMPLES "" OFF)
+	option(VCL_BUILD_TOOLS "" ON)
+	option(VCL_BUILD_TESTS "" OFF)
+	option(VCL_OPENGL_SUPPORT "" ON)
+	add_subdirectory(${VCL_SOURCE_DIR}/src EXCLUDE_FROM_ALL)
+endif()
 
 # Generate library
-ADD_LIBRARY(vcl.hid STATIC "")
+add_library(vcl.hid STATIC "")
 
-SET(VCL_HID_WINDOWS_INC
+set(VCL_HID_WINDOWS_INC
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/windows/hid.h
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/windows/spacenavigator.h
 )
-SET(VCL_HID_WINDOWS_SRC
+set(VCL_HID_WINDOWS_SRC
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/windows/hid.cpp
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/windows/spacenavigator.cpp
 )
 
-SET(VCL_HID_INC
+set(VCL_HID_INC
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/device.h
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/gamepad.h
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/joystick.h
@@ -72,7 +65,7 @@ SET(VCL_HID_INC
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/spacenavigatorhandler.h
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/spacenavigatorvirtualkeys.h
 )
-SET(VCL_HID_SRC
+set(VCL_HID_SRC
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/device.cpp
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/gamepad.cpp
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/joystick.cpp
@@ -80,10 +73,10 @@ SET(VCL_HID_SRC
 	${PROJECT_SOURCE_DIR}/src/vcl/hid/spacenavigator.cpp
 )
 
-SOURCE_GROUP("windows" FILES ${VCL_HID_WINDOWS_SRC} ${VCL_HID_WINDOWS_INC})
-SOURCE_GROUP("" FILES ${VCL_HID_SRC} ${VCL_HID_INC})
+source_group("windows" FILES ${VCL_HID_WINDOWS_SRC} ${VCL_HID_WINDOWS_INC})
+source_group("" FILES ${VCL_HID_SRC} ${VCL_HID_INC})
 
-TARGET_SOURCES(vcl.hid
+target_sources(vcl.hid
 	PRIVATE
 		${VCL_HID_WINDOWS_SRC}
 		${VCL_HID_SRC}
@@ -92,50 +85,50 @@ TARGET_SOURCES(vcl.hid
 		${VCL_HID_INC}
 )
 
-TARGET_INCLUDE_DIRECTORIES(vcl.hid PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_include_directories(vcl.hid PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-SET_TARGET_PROPERTIES(vcl.hid PROPERTIES FOLDER libs)
-SET_TARGET_PROPERTIES(vcl.hid PROPERTIES DEBUG_POSTFIX _d)
+set_target_properties(vcl.hid PROPERTIES FOLDER libs)
+set_target_properties(vcl.hid PROPERTIES DEBUG_POSTFIX _d)
 
-TARGET_LINK_LIBRARIES(vcl.hid
+target_link_libraries(vcl.hid
 	vcl_core
 	hid
 )
 
 # Build examples
-OPTION(VCL_HID_BUILD_EXAMPLES "Build the examples" ${VCL_HID_STANDALONE_PROJECT})
-IF (VCL_HID_BUILD_EXAMPLES)
+option(VCL_HID_BUILD_EXAMPLES "Build the examples" ${VCL_HID_STANDALONE_PROJECT})
+if(VCL_HID_BUILD_EXAMPLES)
 
 	# Enumeration example
-	SET(VCL_HID_EXAMPLE_ENUM_SRC
+	set(VCL_HID_EXAMPLE_ENUM_SRC
 		examples/enum/main.cpp
 	)
 	
-	SOURCE_GROUP("" FILES ${VCL_HID_EXAMPLE_ENUM_SRC})
+	source_group("" FILES ${VCL_HID_EXAMPLE_ENUM_SRC})
 
-	ADD_EXECUTABLE(vcl.hid.enum
+	add_executable(vcl.hid.enum
 		${VCL_HID_EXAMPLE_ENUM_SRC}
 	)
 	
-	SET_TARGET_PROPERTIES(vcl.hid.enum PROPERTIES FOLDER examples)
-	TARGET_LINK_LIBRARIES(vcl.hid.enum
+	set_target_properties(vcl.hid.enum PROPERTIES FOLDER examples)
+	target_link_libraries(vcl.hid.enum
 		vcl.hid
 	)
 
 	# Sample client example
-	SET(VCL_HID_EXAMPLE_CLIENT_SRC
+	set(VCL_HID_EXAMPLE_CLIENT_SRC
 		examples/client/main.cpp
 	)
 	
-	SOURCE_GROUP("" FILES ${VCL_HID_EXAMPLE_CLIENT_SRC})
+	source_group("" FILES ${VCL_HID_EXAMPLE_CLIENT_SRC})
 	
-	ADD_EXECUTABLE(vcl.hid.client
+	add_executable(vcl.hid.client
 		${VCL_HID_EXAMPLE_CLIENT_SRC}
 	)
 	
-	SET_TARGET_PROPERTIES(vcl.hid.client PROPERTIES FOLDER examples)
-	TARGET_LINK_LIBRARIES(vcl.hid.client
+	set_target_properties(vcl.hid.client PROPERTIES FOLDER examples)
+	target_link_libraries(vcl.hid.client
 		vcl.hid
 	)
 
-ENDIF (VCL_HID_BUILD_EXAMPLES)
+endif(VCL_HID_BUILD_EXAMPLES)

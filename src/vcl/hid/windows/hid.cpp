@@ -793,13 +793,16 @@ namespace Vcl { namespace HID { namespace Windows
 				continue;
 			}
 
+			// New device
+			std::unique_ptr<AbstractHID> device;
+
 			/*if (dev_info.dwType == RIM_TYPEMOUSE)
 			{
-				_devices.emplace_back(std::make_unique<GenericHID>(desc.hDevice));
+				device = std::make_unique<GenericHID>(desc.hDevice);
 			}
 			else if (dev_info.dwType == RIM_TYPEKEYBOARD)
 			{
-				_devices.emplace_back(std::make_unique<GenericHID>(desc.hDevice));
+				device = std::make_unique<GenericHID>(desc.hDevice);
 			}
 			else*/ if (dev_info.dwType == RIM_TYPEHID)
 			{
@@ -813,12 +816,12 @@ namespace Vcl { namespace HID { namespace Windows
 					{
 					case 0x04:
 					{
-						_devices.emplace_back(std::make_unique<JoystickHID<Joystick>>(std::move(hid)));
+						device = std::make_unique<JoystickHID<Joystick>>(std::move(hid));
 						break;
 					}
 					case 0x05:
 					{
-						_devices.emplace_back(std::make_unique<GamepadHID<Gamepad>>(std::move(hid)));
+						device = std::make_unique<GamepadHID<Gamepad>>(std::move(hid));
 						break;
 					}
 					case 0x08:
@@ -827,17 +830,21 @@ namespace Vcl { namespace HID { namespace Windows
 						if (dev_info.hid.dwVendorId == SpaceNavigator::LogitechVendorID &&
 							names.first == L"3Dconnexion" && names.second == L"SpaceNavigator")
 						{
-							_devices.emplace_back(std::make_unique<SpaceNavigatorHID>(std::move(hid)));
+							device = std::make_unique<SpaceNavigatorHID>(std::move(hid));
 						}
 						else
 						{
-							_devices.emplace_back(std::make_unique<MultiAxisControllerHID<MultiAxisController>>(std::move(hid)));
+							device = std::make_unique<MultiAxisControllerHID<MultiAxisController>>(std::move(hid));
 						}
 						break;
 					}
 					}
 					// Store a link to the created device for external use
-					_deviceLinks.emplace_back(dynamic_cast<Device*>(_devices.back().get()));
+					if (device)
+					{
+						_deviceLinks.emplace_back(dynamic_cast<Device*>(device.get()));
+						_devices.emplace_back(std::move(device));
+					}
 				}
 			}
 		}
